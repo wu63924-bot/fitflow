@@ -6,7 +6,7 @@ export const analyticsPeriods = [{ label: '7天', days: 7 }, { label: '30天', d
 export interface AnalyticsInput { sessions: WorkoutSession[]; schedules: DailySchedule[]; weights: BodyRecord[]; meals: StoredMeal[]; exercises: Exercise[]; target: NutritionTarget }
 export interface ChartPoint { date: string; value: number; secondary?: number }
 export interface Performance { date: string; sessionId: string; weight: number; reps: number; volume: number }
-const muscles = ['胸', '背', '肩', '腿', '二头', '三头', '核心'];
+const muscles = ['胸', '背', '肩', '腿', '二头', '三头', '腹部', '核心'];
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const positive = (value: unknown): value is number => finite(value) && value > 0;
 export function validDate(value: string): boolean {

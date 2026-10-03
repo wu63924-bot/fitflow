@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { ExercisePicker } from '../components/ExercisePicker';
 import { getTodayWorkoutDay } from '../utils/workout';
 import { Modal, useToast } from '../components/UI';
 import { completeCardio, createStrengthTemplateFromPlan, saveDailyNote, saveDailySchedule } from '../services/scheduleService';
@@ -89,13 +90,11 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
     setCustomExercises(current => current.map((exercise, itemIndex) => itemIndex === index ? update(exercise) : exercise));
   }
 
-  function addCustomExercise() {
-    const definition = exercises[0];
-    if (!definition) { toast('动作库为空，无法添加自定义训练'); return; }
+  function addCustomExercise(definition: Exercise) {
     setCustomExercises(current => [...current, {
       exerciseId: definition.id, name: definition.name, muscle: definition.muscle, category: definition.category,
       restSeconds: definition.restSeconds, restInput: String(definition.restSeconds),
-      sets: Array.from({ length: definition.sets || 3 }, () => ({ weight: String(definition.referenceWeight ?? 0), reps: definition.lastSets?.[0]?.reps.toString() ?? '10' }))
+      sets: [{ weight: String(definition.referenceWeight ?? 0), reps: definition.lastSets?.[0]?.reps.toString() ?? '10' }]
     }]);
   }
 
@@ -112,12 +111,12 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
         if (!customExercises.length) throw new Error('至少添加一个动作');
         const templateExercises = customExercises.map(exercise => {
           const restSeconds = Number(exercise.restInput);
-          if (!exercise.exerciseId || !exercise.sets.length || exercise.sets.length > 20 || !Number.isInteger(restSeconds) || restSeconds < 0) throw new Error('请检查动作、组数和休息时间');
+          if (!exercise.exerciseId || !exercise.sets.length || exercise.sets.length > 20 || !exercise.restInput.trim() || !Number.isInteger(restSeconds) || restSeconds < 0) throw new Error('请检查动作、组数和休息时间');
           const definition = exercises.find(item => item.id === exercise.exerciseId);
           const sets = exercise.sets.map(set => {
             const weight = Number(set.weight);
             const reps = Number(set.reps);
-            if (!Number.isFinite(weight) || weight < 0 || !Number.isFinite(reps) || reps < 1) throw new Error('重量不能小于 0，次数需大于 0');
+            if (!set.weight.trim() || !set.reps.trim() || !Number.isFinite(weight) || weight < 0 || !Number.isInteger(reps) || reps < 1) throw new Error('重量不能小于 0，次数需大于 0');
             return { weight, reps };
           });
           return {
@@ -186,14 +185,7 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
       </> : <>
         <label className="field-label">本次训练名称<input className="text-input" maxLength={30} value={workoutName} onChange={event => setWorkoutName(event.target.value)} /></label>
         {customExercises.map((exercise, index) => <section className="custom-exercise-editor" key={`${exercise.exerciseId}-${index}`}>
-          <div className="row-between"><strong>动作 {index + 1}</strong><button className="text-button" type="button" onClick={() => setCustomExercises(current => current.filter((_, itemIndex) => itemIndex !== index))}>移除</button></div>
-          <label className="field-label">动作<select className="text-input" value={exercise.exerciseId} onChange={event => {
-            const definition = exercises.find(item => item.id === event.target.value);
-            if (definition) updateExercise(index, current => ({ ...current, exerciseId: definition.id, name: definition.name, muscle: definition.muscle, category: definition.category, restSeconds: definition.restSeconds, restInput: String(definition.restSeconds) }));
-          }}>
-            {exercise.name && !exercises.some(item => item.id === exercise.exerciseId) && <option value={exercise.exerciseId}>{exercise.name}</option>}
-            {exercises.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>
+          <div className="row-between"><strong>{index + 1}. {exercise.name}</strong><button className="text-button" type="button" onClick={() => setCustomExercises(current => current.filter((_, itemIndex) => itemIndex !== index))}>移除</button></div>
           <label className="field-label">动作间休息（秒）<input className="text-input" type="number" min="0" step="1" value={exercise.restInput} onChange={event => updateExercise(index, current => ({ ...current, restInput: event.target.value }))} /></label>
           {exercise.sets.map((set, setIndex) => <div className="scheduled-set-editor" key={`${exercise.exerciseId}-${index}-${setIndex}`}>
             <strong>第 {setIndex + 1} 组</strong>
@@ -203,7 +195,7 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
           </div>)}
           <button className="text-button" type="button" onClick={() => updateExercise(index, current => current.sets.length >= 20 ? current : ({ ...current, sets: [...current.sets, { ...(current.sets[current.sets.length - 1] ?? { weight: '0', reps: '10' }) }] }))}>＋ 添加一组</button>
         </section>)}
-        <button className="secondary-button full-button" type="button" onClick={addCustomExercise}>＋ 添加动作</button>
+        <ExercisePicker exercises={exercises} onAdd={addCustomExercise} />
       </>}
     </Modal>;
   }

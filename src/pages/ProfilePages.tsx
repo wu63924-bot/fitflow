@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { mockUser } from '../data/mock';
@@ -48,14 +48,17 @@ export function BodyDataPage() {
   const toast = useToast();
   const { data, loading, refresh } = useAsyncData(async () => listBodyRecords());
   const latest = data?.[0];
-  const [weight, setWeight] = useState<number>();
-  const [height, setHeight] = useState<number>();
-  const weightValue = weight ?? latest?.weight ?? 70.2;
-  const heightValue = height ?? latest?.height ?? 175;
-  const bmi = heightValue > 0 ? weightValue / Math.pow(heightValue / 100, 2) : 0;
+  const [weight, setWeight] = useState<string>();
+  const [height, setHeight] = useState<string>();
+  const weightInput = weight ?? String(latest?.weight ?? 70.2);
+  const heightInput = height ?? String(latest?.height ?? 175);
+  const weightValue = Number(weightInput);
+  const heightValue = Number(heightInput);
+  const validBodyValues = weightInput.trim() !== '' && heightInput.trim() !== '' && Number.isFinite(weightValue) && Number.isFinite(heightValue) && weightValue > 0 && heightValue > 0;
+  const bmi = validBodyValues ? weightValue / Math.pow(heightValue / 100, 2) : undefined;
 
   async function save() {
-    if (weightValue <= 0 || heightValue <= 0) { toast('请输入有效的体重和身高'); return; }
+    if (!validBodyValues) { toast('请填写大于 0 的体重和身高'); return; }
     await saveBodyRecord({ date: dateKey(new Date()), weight: weightValue, height: heightValue });
     await refresh();
     toast('身体数据已保存');
@@ -75,9 +78,9 @@ export function BodyDataPage() {
   return <div className="page">
     <BackHeader title="身体数据" subtitle="记录会保存在本机" />
     <section className="card body-form">
-      <label className="field-label">体重（kg）<input className="text-input" type="number" inputMode="decimal" step="0.1" min="1" value={weightValue} onChange={event => setWeight(Number(event.target.value))} /></label>
-      <label className="field-label">身高（cm）<input className="text-input" type="number" inputMode="decimal" step="0.1" min="1" value={heightValue} onChange={event => setHeight(Number(event.target.value))} /></label>
-      <div className="bmi-card"><span>BMI</span><strong>{bmi.toFixed(1)}</strong><small>{bmi < 18.5 ? '偏轻' : bmi < 24 ? '健康范围' : bmi < 28 ? '偏重' : '肥胖'}</small></div>
+      <label className="field-label">体重（kg）<input className="text-input" type="number" inputMode="decimal" step="0.1" min="1" value={weightInput} onChange={event => setWeight(event.target.value)} /></label>
+      <label className="field-label">身高（cm）<input className="text-input" type="number" inputMode="decimal" step="0.1" min="1" value={heightInput} onChange={event => setHeight(event.target.value)} /></label>
+      <div className="bmi-card"><span>BMI</span><strong>{bmi?.toFixed(1) ?? '—'}</strong><small>{bmi === undefined ? '填写体重和身高后计算' : bmi < 18.5 ? '偏轻' : bmi < 24 ? '健康范围' : bmi < 28 ? '偏重' : '肥胖'}</small></div>
       <button className="primary-button full-button" onClick={() => void save()}>保存今日数据</button>
     </section>
     <section className="section">
@@ -95,11 +98,17 @@ export function SettingsPage() {
     const [settings, target] = await Promise.all([getSettings(), getNutritionTarget()]);
     return { settings, target };
   });
-  const [targetDraft, setTargetDraft] = useState<StoredNutritionTarget>();
-  useEffect(() => { if (data) setTargetDraft(data.target); }, [data?.target]);
+  const [targetDraft, setTargetDraft] = useState<Partial<Record<'calories' | 'protein' | 'carbs' | 'fat', string>>>({});
+  const [restDraft, setRestDraft] = useState<string>();
   if (loading || !data) return <div className="page"><div className="loading-state"><span className="spinner" />正在读取设置…</div></div>;
   const currentData = data;
-  const currentTarget = targetDraft ?? currentData.target;
+  const currentTarget = {
+    calories: targetDraft.calories ?? String(currentData.target.calories),
+    protein: targetDraft.protein ?? String(currentData.target.protein),
+    carbs: targetDraft.carbs ?? String(currentData.target.carbs),
+    fat: targetDraft.fat ?? String(currentData.target.fat)
+  };
+  const restInput = restDraft ?? String(currentData.settings.trainingSettings.defaultRestSeconds);
 
   async function updateSettings(change: Partial<StoredAppSettings['trainingSettings']>) {
     const settings: StoredAppSettings = { ...currentData.settings, trainingSettings: { ...currentData.settings.trainingSettings, ...change } };
@@ -107,11 +116,25 @@ export function SettingsPage() {
     setData(current => current ? { ...current, settings } : current);
   }
   async function saveTarget() {
-    const target = { ...currentTarget, id: 'current' as const };
+    if (Object.values(currentTarget).some(value => !value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0)) { toast('请完整填写营养目标，数值不能小于 0'); return; }
+    const target: StoredNutritionTarget = { id: 'current', calories: Number(currentTarget.calories), protein: Number(currentTarget.protein), carbs: Number(currentTarget.carbs), fat: Number(currentTarget.fat) };
     await saveNutritionTarget(target);
     setData(current => current ? { ...current, target } : current);
-    setTargetDraft(target);
+    setTargetDraft(current => current === targetDraft ? {} : current);
     toast('营养目标已保存');
+  }
+
+  function adjustRestDraft(delta: number) {
+    const value = restInput.trim() ? Number(restInput) : currentData.settings.trainingSettings.defaultRestSeconds;
+    setRestDraft(String(Math.max(30, Math.min(600, value + delta))));
+  }
+
+  async function saveRest() {
+    const defaultRestSeconds = Number(restInput);
+    if (!restInput.trim() || !Number.isInteger(defaultRestSeconds) || defaultRestSeconds < 30 || defaultRestSeconds > 600) { toast('默认休息时间需为 30–600 秒的整数'); return; }
+    await updateSettings({ defaultRestSeconds });
+    setRestDraft(current => current === restDraft ? undefined : current);
+    toast('默认休息时间已保存');
   }
 
   return <div className="page">
@@ -119,7 +142,7 @@ export function SettingsPage() {
     <section className="section">
       <SectionTitle title="训练偏好" />
       <div className="settings-card card">
-        <div className="setting-row"><div><strong>默认休息时间</strong><small>每个动作仍可单独设置</small></div><div className="setting-stepper"><button onClick={() => void updateSettings({ defaultRestSeconds: Math.max(30, data.settings.trainingSettings.defaultRestSeconds - 15) })}>−</button><strong>{data.settings.trainingSettings.defaultRestSeconds}s</strong><button onClick={() => void updateSettings({ defaultRestSeconds: Math.min(600, data.settings.trainingSettings.defaultRestSeconds + 15) })}>＋</button></div></div>
+        <div className="setting-row rest-setting-row"><div><strong>默认休息时间</strong><small>每个动作仍可单独设置</small></div><div className="rest-setting-controls"><div className="setting-stepper"><button aria-label="减少默认休息时间 15 秒" onClick={() => adjustRestDraft(-15)}>−</button><input className="text-input" aria-label="默认休息时间（秒）" type="number" inputMode="numeric" min="30" max="600" step="1" value={restInput} onChange={event => setRestDraft(event.target.value)} /><span className="small muted">秒</span><button aria-label="增加默认休息时间 15 秒" onClick={() => adjustRestDraft(15)}>＋</button></div><button className="text-button" onClick={() => void saveRest()}>保存休息时间</button></div></div>
         <label className="setting-row"><span><strong>完成一组后自动休息</strong><small>休息结束时间会持久化</small></span><input type="checkbox" checked={data.settings.trainingSettings.autoRestTimer} onChange={event => void updateSettings({ autoRestTimer: event.target.checked })} /></label>
         <label className="setting-row"><span><strong>休息结束震动</strong><small>浏览器支持时轻微震动</small></span><input type="checkbox" checked={data.settings.trainingSettings.vibrationEnabled} onChange={event => void updateSettings({ vibrationEnabled: event.target.checked })} /></label>
         <label className="setting-row"><span><strong>休息结束提示音</strong><small>浏览器版本暂不播放声音</small></span><input type="checkbox" checked={data.settings.trainingSettings.soundEnabled} onChange={event => void updateSettings({ soundEnabled: event.target.checked })} /></label>
@@ -128,7 +151,7 @@ export function SettingsPage() {
     <section className="section">
       <SectionTitle title="每日营养目标" />
       <div className="card target-form">
-        {([['calories', '热量', 'kcal'], ['protein', '蛋白质', 'g'], ['carbs', '碳水', 'g'], ['fat', '脂肪', 'g']] as const).map(([key, label, unit]) => <label className="target-input-row" key={key}><span>{label}</span><input className="text-input" type="number" min="0" value={currentTarget[key]} onChange={event => setTargetDraft({ ...currentTarget, [key]: Math.max(0, Number(event.target.value) || 0), id: 'current' })} /><span>{unit}</span></label>)}
+        {([['calories', '热量', 'kcal'], ['protein', '蛋白质', 'g'], ['carbs', '碳水', 'g'], ['fat', '脂肪', 'g']] as const).map(([key, label, unit]) => <label className="target-input-row" key={key}><span>{label}</span><input className="text-input" type="number" inputMode="decimal" min="0" step="any" value={currentTarget[key]} onChange={event => setTargetDraft(current => ({ ...current, [key]: event.target.value }))} /><span>{unit}</span></label>)}
         <button className="secondary-button full-button" onClick={() => void saveTarget()}>保存每日营养目标</button>
       </div>
     </section>

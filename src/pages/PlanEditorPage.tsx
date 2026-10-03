@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { moveItem, plannedExerciseFromDefinition } from '../utils/workout';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { listExercises, saveExercise } from '../repositories/exerciseRepository';
+import { listExercises } from '../repositories/exerciseRepository';
 import { getSettings, saveSettings } from '../repositories/settingsRepository';
 import { getTrainingPlan, saveTrainingPlan } from '../repositories/trainingPlanRepository';
 import { BackHeader, EmptyState, useToast } from '../components/UI';
-import type { Exercise, ExerciseCategory, PlannedExercise, TrainingPlan, WorkoutDay } from '../types';
+import { ExercisePicker } from '../components/ExercisePicker';
+import type { Exercise, TrainingPlan, WorkoutDay } from '../types';
 
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const categories: ExerciseCategory[] = ['胸', '背', '肩', '二头', '三头', '腿', '核心', '有氧', '其他'];
+type ParameterField = 'sets' | 'reps' | 'referenceWeight' | 'restSeconds';
 
 function newPlan(): TrainingPlan {
   const now = Date.now();
@@ -34,10 +34,7 @@ export function PlanEditorPage() {
   const [draft, setDraft] = useState<TrainingPlan>();
   const [extraExercises, setExtraExercises] = useState<Exercise[]>([]);
   const [selectedDayId, setSelectedDayId] = useState('');
-  const [exerciseId, setExerciseId] = useState('');
-  const [showCustomExercise, setShowCustomExercise] = useState(false);
-  const [customName, setCustomName] = useState('');
-  const [customCategory, setCustomCategory] = useState<ExerciseCategory>('胸');
+  const [parameterInputs, setParameterInputs] = useState<Record<string, Partial<Record<ParameterField, string>>>>({});
   const { data, loading } = useAsyncData(async () => {
     const [plan, exercises] = await Promise.all([isNew ? Promise.resolve(newPlan()) : getTrainingPlan(planId), listExercises()]);
     return { plan, exercises };
@@ -59,10 +56,8 @@ export function PlanEditorPage() {
     setDraft(current => current && ({ ...current, days: current.days.map(day => day.id === dayId ? { ...day, ...change } : day) }));
   }
 
-  function updateExercise(dayId: string, exerciseIdToUpdate: string, change: Partial<PlannedExercise>) {
-    setDraft(current => current && ({ ...current, days: current.days.map(day => day.id === dayId ? {
-      ...day, exercises: day.exercises.map(item => item.id === exerciseIdToUpdate ? { ...item, ...change } : item)
-    } : day) }));
+  function setParameterInput(id: string, field: ParameterField, value: string) {
+    setParameterInputs(current => ({ ...current, [id]: { ...current[id], [field]: value } }));
   }
 
   function reorderExercise(day: WorkoutDay, index: number, delta: number) {
@@ -72,36 +67,37 @@ export function PlanEditorPage() {
 
   async function onSave() {
     if (!currentDraft.name.trim()) { toast('请输入计划名称'); return; }
-    await saveTrainingPlan({ ...currentDraft, name: currentDraft.name.trim() });
-    const settings = await getSettings();
-    if (!settings.activePlanId) await saveSettings({ ...settings, activePlanId: currentDraft.id });
-    toast('训练计划已保存');
-    navigate('/workout', { replace: true });
+    try {
+      const days = currentDraft.days.map(day => ({ ...day, exercises: day.exercises.map(item => {
+        const input = parameterInputs[item.id];
+        function readNumber(value: string, label: string, min: number, max = Infinity, integer = true) {
+          const number = Number(value);
+          if (!value.trim() || !Number.isFinite(number) || number < min || number > max || (integer && !Number.isInteger(number))) {
+            throw new Error(`${day.weekday}：请填写有效的${label}`);
+          }
+          return number;
+        }
+        const reps = readNumber(input?.reps ?? String(item.repsMin), '次数', 1);
+        // Retain the existing storage fields for old plans and backups; new edits use a fixed count.
+        return { ...item,
+          sets: readNumber(input?.sets ?? String(item.sets), '组数（1–20）', 1, 20),
+          repsMin: reps, repsMax: reps,
+          referenceWeight: readNumber(input?.referenceWeight ?? String(item.referenceWeight ?? 0), '参考重量', 0, Infinity, false),
+          restSeconds: readNumber(input?.restSeconds ?? String(item.restSeconds), '休息秒数（0–600）', 0, 600)
+        };
+      }) }));
+      await saveTrainingPlan({ ...currentDraft, days, name: currentDraft.name.trim() });
+      const settings = await getSettings();
+      if (!settings.activePlanId) await saveSettings({ ...settings, activePlanId: currentDraft.id });
+      toast('训练计划已保存');
+      navigate('/workout', { replace: true });
+    } catch (error) { toast(error instanceof Error ? error.message : '训练计划保存失败'); }
   }
 
-  async function addExercise() {
-    if (!selectedDay || selectedDay.isRestDay) { toast('先选择一个训练日'); return; }
-    const definition = exerciseOptions.find(item => item.id === exerciseId);
-    if (!definition) { toast('请选择动作'); return; }
-    const planned = plannedExerciseFromDefinition(definition, selectedDay.exercises.length);
-    updateDay(selectedDay.id, { exercises: [...selectedDay.exercises, planned] });
-    setExerciseId('');
-  }
-
-  async function onCreateExercise(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = customName.trim();
-    if (!name) { toast('请输入动作名称'); return; }
-    const exercise: Exercise = {
-      id: `custom-${Date.now()}-${Math.floor(Math.random() * 10000)}`, name,
-      muscle: `${customCategory}部`, category: customCategory, sets: 3, repRange: '8–12', restSeconds: 90, isCustom: true
-    };
-    await saveExercise(exercise);
-    setExtraExercises(current => [...current, exercise]);
-    if (selectedDay) updateDay(selectedDay.id, { exercises: [...selectedDay.exercises, plannedExerciseFromDefinition(exercise, selectedDay.exercises.length)] });
-    setCustomName('');
-    setShowCustomExercise(false);
-    toast('动作已添加');
+  function addExercise(definition: Exercise) {
+    if (!selectedDay || selectedDay.isRestDay) return;
+    if (!exerciseOptions.some(item => item.id === definition.id)) setExtraExercises(current => [...current, definition]);
+    updateDay(selectedDay.id, { exercises: [...selectedDay.exercises, { ...plannedExerciseFromDefinition(definition, selectedDay.exercises.length), sets: 1 }] });
   }
 
   return <div className="page">
@@ -132,27 +128,14 @@ export function PlanEditorPage() {
           return <div className="planned-editor card" key={item.id}>
             <div className="planned-editor-title"><strong>{exercise?.name ?? '未知动作'}</strong><div className="inline-actions"><button className="icon-button" aria-label="上移" disabled={index === 0} onClick={() => reorderExercise(selectedDay, index, -1)}>↑</button><button className="icon-button" aria-label="下移" disabled={index === selectedDay.exercises.length - 1} onClick={() => reorderExercise(selectedDay, index, 1)}>↓</button><button className="icon-button danger-icon" aria-label="删除" onClick={() => updateDay(selectedDay.id, { exercises: selectedDay.exercises.filter(exerciseItem => exerciseItem.id !== item.id).map((exerciseItem, order) => ({ ...exerciseItem, order })) })}>×</button></div></div>
             <div className="planned-fields">
-              <label>组数<input type="number" min="1" max="20" value={item.sets} onChange={event => updateExercise(selectedDay.id, item.id, { sets: Math.max(1, Math.min(20, Number(event.target.value) || 1)) })} /></label>
-              <label>次数下限<input type="number" min="1" value={item.repsMin} onChange={event => { const repsMin = Math.max(1, Number(event.target.value) || 1); updateExercise(selectedDay.id, item.id, { repsMin, repsMax: Math.max(item.repsMax, repsMin) }); }} /></label>
-              <label>次数上限<input type="number" min="1" value={item.repsMax} onChange={event => updateExercise(selectedDay.id, item.id, { repsMax: Math.max(item.repsMin, Number(event.target.value) || item.repsMin) })} /></label>
-              <label>参考重量 kg<input type="number" min="0" step="0.5" value={item.referenceWeight ?? 0} onChange={event => updateExercise(selectedDay.id, item.id, { referenceWeight: Math.max(0, Number(event.target.value) || 0) })} /></label>
-              <label>休息秒数<input type="number" min="0" max="600" step="15" value={item.restSeconds} onChange={event => updateExercise(selectedDay.id, item.id, { restSeconds: Math.max(0, Math.min(600, Number(event.target.value) || 0)) })} /></label>
+              <label>组数<input type="number" min="1" max="20" step="1" inputMode="numeric" value={parameterInputs[item.id]?.sets ?? String(item.sets)} onChange={event => setParameterInput(item.id, 'sets', event.target.value)} /></label>
+              <label>次数<input type="number" min="1" step="1" inputMode="numeric" value={parameterInputs[item.id]?.reps ?? String(item.repsMin)} onChange={event => setParameterInput(item.id, 'reps', event.target.value)} /></label>
+              <label>参考重量 kg<input type="number" min="0" step="0.5" inputMode="decimal" value={parameterInputs[item.id]?.referenceWeight ?? String(item.referenceWeight ?? 0)} onChange={event => setParameterInput(item.id, 'referenceWeight', event.target.value)} /></label>
+              <label>休息秒数<input type="number" min="0" max="600" step="1" inputMode="numeric" value={parameterInputs[item.id]?.restSeconds ?? String(item.restSeconds)} onChange={event => setParameterInput(item.id, 'restSeconds', event.target.value)} /></label>
             </div>
           </div>;
         })}
-        <div className="add-exercise-row">
-          <select className="text-input" aria-label="选择动作" value={exerciseId} onChange={event => setExerciseId(event.target.value)}>
-            <option value="">选择动作库动作</option>
-            {exerciseOptions.map(item => <option key={item.id} value={item.id}>{item.name}{item.isCustom ? ' · 自定义' : ''}</option>)}
-          </select>
-          <button className="secondary-button" onClick={() => void addExercise()}>添加动作</button>
-        </div>
-        <button className="text-button custom-exercise-toggle" onClick={() => setShowCustomExercise(value => !value)}>{showCustomExercise ? '收起自定义动作' : '＋ 新建自定义动作'}</button>
-        {showCustomExercise && <form className="custom-exercise-form" onSubmit={event => void onCreateExercise(event)}>
-          <input className="text-input" placeholder="动作名称" value={customName} onChange={event => setCustomName(event.target.value)} required />
-          <select className="text-input" value={customCategory} onChange={event => setCustomCategory(event.target.value as ExerciseCategory)}>{categories.map(category => <option key={category}>{category}</option>)}</select>
-          <button className="secondary-button">保存动作</button>
-        </form>}
+        <ExercisePicker exercises={exerciseOptions} onAdd={addExercise} />
       </>}
     </section>}
     <button className="primary-button sticky-action" onClick={() => void onSave()}>保存训练计划</button>

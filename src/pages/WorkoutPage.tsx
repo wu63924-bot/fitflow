@@ -107,7 +107,7 @@ export function WorkoutPage() {
         {day.exercises.slice().sort((a, b) => a.order - b.order).map((planned, index) => {
           const exercise = data.exercises.find(item => item.id === planned.exerciseId);
           return <div className="exercise-card card" key={planned.id}>
-            <span className="exercise-index">{index + 1}</span><div className="exercise-info"><strong className="exercise-name">{exercise?.name ?? '动作'}</strong><span className="exercise-meta">{planned.sets} 组 × {planned.repsMin}-{planned.repsMax} 次 · {planned.referenceWeight ?? 0}kg · 休息 {planned.restSeconds}s</span></div>
+            <span className="exercise-index">{index + 1}</span><div className="exercise-info"><strong className="exercise-name">{exercise?.name ?? '动作'}</strong><span className="exercise-meta">{planned.sets} 组 × {planned.repsMin === planned.repsMax ? planned.repsMin : `${planned.repsMin}-${planned.repsMax}`} 次 · {planned.referenceWeight ?? 0}kg · 休息 {planned.restSeconds}s</span></div>
           </div>;
         })}
       </section> : !data.schedule?.type && day && !day.isRestDay ? <div className="section"><EmptyState title="这个训练日还没有动作">编辑训练日并从动作库添加动作。</EmptyState><button className="secondary-button full-button" onClick={() => navigate(`/workout/plans/${data.plan?.id}?day=${day.id}`)}>编辑训练日</button></div> : null}

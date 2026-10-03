@@ -12,13 +12,31 @@ import { BackHeader, EmptyState, useToast } from '../components/UI';
 import type { WorkoutSession, WorkoutSessionExercise } from '../types';
 
 interface SessionLoaded { session?: WorkoutSession; sessions: WorkoutSession[]; autoRestTimer: boolean; vibrationEnabled: boolean; exercises: Awaited<ReturnType<typeof listExercises>>; }
+type SetInput = { weight?: string; reps?: string };
+
+function readSetValues(set: WorkoutSessionExercise['sets'][number], input: SetInput | undefined, label: string) {
+  const weightInput = input?.weight ?? String(set.weight);
+  const repsInput = input?.reps ?? String(set.reps);
+  const weight = Number(weightInput);
+  const reps = Number(repsInput);
+  if (!weightInput.trim() || !Number.isFinite(weight) || weight < 0) throw new Error(`${label}：请填写不小于 0 的重量`);
+  if (!repsInput.trim() || !Number.isInteger(reps) || reps < 1) throw new Error(`${label}：请填写大于 0 的整数次数`);
+  return { weight, reps };
+}
+
+function applySetValues(session: WorkoutSession, values: Map<string, ReturnType<typeof readSetValues>>) {
+  for (const exercise of session.exercises) for (const set of exercise.sets) {
+    const value = values.get(set.id);
+    if (value) Object.assign(set, value);
+  }
+}
 
 export function SessionPage() {
   const { sessionId = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
   const [now, setNow] = useState(Date.now());
-  const [draftInputs, setDraftInputs] = useState<Record<string, { weight?: string; reps?: string }>>({});
+  const [draftInputs, setDraftInputs] = useState<Record<string, SetInput>>({});
   const [exerciseId, setExerciseId] = useState('');
   const { data, loading, refresh, setData } = useAsyncData<SessionLoaded>(async () => {
     const [session, sessions, settings, exercises] = await Promise.all([getWorkoutSession(sessionId), listWorkoutSessions(), getSettings(), listExercises()]);
@@ -59,17 +77,13 @@ export function SessionPage() {
     if (updated) setData(current => current ? { ...current, session: updated, sessions: current.sessions.map(item => item.id === updated.id ? updated : item) } : current);
   }
 
-  async function onInputChange(exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', raw: string) {
+  function onInputChange(exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', raw: string) {
     const set = activeSession.exercises[exerciseIndex]?.sets[setIndex];
     if (!set) return;
     setDraftInputs(current => ({ ...current, [set.id]: { ...current[set.id], [field]: raw } }));
-    if (!raw.trim()) return;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || (field === 'reps' && value < 1)) return;
-    await mutate(current => { current.exercises[exerciseIndex].sets[setIndex][field] = value; });
   }
 
-  async function onAdjustSet(exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', delta: number) {
+  function onAdjustSet(exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', delta: number) {
     const set = activeSession.exercises[exerciseIndex]?.sets[setIndex];
     if (!set) return;
     const draftValue = draftInputs[set.id]?.[field];
@@ -77,17 +91,34 @@ export function SessionPage() {
     const currentValue = Number.isFinite(parsedDraft) ? parsedDraft : set[field];
     const value = field === 'weight' ? Math.max(0, Math.round((currentValue + delta) * 10) / 10) : Math.max(1, currentValue + delta);
     setDraftInputs(current => ({ ...current, [set.id]: { ...current[set.id], [field]: String(value) } }));
-    await mutate(current => { current.exercises[exerciseIndex].sets[setIndex][field] = value; });
+  }
+
+  function readDraftValues() {
+    const values = new Map<string, ReturnType<typeof readSetValues>>();
+    for (const exercise of activeSession.exercises) exercise.sets.forEach((set, index) => {
+      const input = draftInputs[set.id];
+      if (input) values.set(set.id, readSetValues(set, input, `${exercise.name}第 ${index + 1} 组`));
+    });
+    return values;
+  }
+
+  async function onSaveSets() {
+    try {
+      const values = readDraftValues();
+      await mutate(current => applySetValues(current, values));
+      setDraftInputs(current => Object.fromEntries(Object.entries(current).filter(([id, input]) => input !== draftInputs[id])));
+      toast('组数据已保存');
+    } catch (error) { toast(error instanceof Error ? error.message : '组数据保存失败'); }
   }
 
   async function onCompleteSet(exerciseIndex: number, setIndex: number) {
     const set = activeSession.exercises[exerciseIndex]?.sets[setIndex];
     if (!set) return;
-    const setInput = draftInputs[set.id];
-    const weight = setInput?.weight === undefined ? set.weight : Number(setInput.weight);
-    const reps = setInput?.reps === undefined ? set.reps : Number(setInput.reps);
-    const hasBlankInput = setInput?.weight?.trim() === '' || setInput?.reps?.trim() === '';
-    if (!set.completed && (hasBlankInput || !Number.isFinite(weight) || !Number.isFinite(reps) || weight < 0 || reps < 1)) { toast('重量不能为负数，次数需大于 0'); return; }
+    let values = { weight: set.weight, reps: set.reps };
+    if (!set.completed) {
+      try { values = readSetValues(set, draftInputs[set.id], `第 ${setIndex + 1} 组`); }
+      catch (error) { toast(error instanceof Error ? error.message : '请检查本组数据'); return; }
+    }
     const completedAt = Date.now();
     await mutate(current => {
       const activeSet = current.exercises[exerciseIndex].sets[setIndex];
@@ -97,14 +128,18 @@ export function SessionPage() {
         if (current.restTimer?.triggeredBySetId === activeSet.id) current.restTimer = undefined;
         return;
       }
-      activeSet.weight = weight;
-      activeSet.reps = reps;
+      activeSet.weight = values.weight;
+      activeSet.reps = values.reps;
       activeSet.completed = true;
       activeSet.completedAt = completedAt;
       if (!activeData.autoRestTimer) return;
       const next = findNextSet(current, exerciseIndex, setIndex + 1);
       if (next) current.restTimer = createRestTimer(next.exerciseIndex, next.setIndex, current.exercises[next.exerciseIndex].restSeconds, completedAt, current.exercises[next.exerciseIndex].id, next.set.id, activeSet.id);
       else current.restTimer = undefined;
+    });
+    if (!set.completed) setDraftInputs(current => {
+      if (current[set.id] !== draftInputs[set.id]) return current;
+      const next = { ...current }; delete next[set.id]; return next;
     });
   }
 
@@ -137,7 +172,7 @@ export function SessionPage() {
   async function addTemporaryExercise() {
     const definition = activeData.exercises.find(item => item.id === exerciseId);
     if (!definition) { toast('先选择一个动作'); return; }
-    const planned = plannedExerciseFromDefinition(definition, activeSession.exercises.length);
+    const planned = { ...plannedExerciseFromDefinition(definition, activeSession.exercises.length), sets: 1 };
     const updated = await addExerciseToWorkout(activeSession.id, planned);
     if (updated) {
       setData(current => current ? { ...current, session: updated } : current);
@@ -151,8 +186,11 @@ export function SessionPage() {
   }
 
   async function onFinish() {
+    let values: ReturnType<typeof readDraftValues>;
+    try { values = readDraftValues(); }
+    catch (error) { toast(error instanceof Error ? error.message : '请检查组数据'); return; }
     if (hasIncompleteSets(activeSession) && !window.confirm(`还有 ${incompleteSets} 组未完成。仍要结束训练吗？`)) return;
-    await mutate(current => { current.status = 'completed'; current.endedAt = Date.now(); current.restTimer = undefined; });
+    await mutate(current => { applySetValues(current, values); current.status = 'completed'; current.endedAt = Date.now(); current.restTimer = undefined; });
     navigate(`/workout/report/${activeSession.id}`, { replace: true });
   }
 
@@ -166,7 +204,7 @@ export function SessionPage() {
     {exerciseViews.length > 0 && <div className="exercise-navigation card"><button className="nav-button" disabled={currentIndex === 0} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.max(0, current.currentExerciseIndex - 1); })}>‹ 上一动作</button><span className="nav-count">{currentIndex + 1} / {exerciseViews.length}</span><button className="nav-button" disabled={currentIndex >= exerciseViews.length - 1} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.min(current.exercises.length - 1, current.currentExerciseIndex + 1); })}>下一动作 ›</button></div>}
     {!exerciseViews.length && <EmptyState title="本次训练还没有动作">从动作库临时添加一个动作。</EmptyState>}
 
-    {currentExercise && <ExercisePanel exercise={currentExercise} exerciseIndex={currentIndex} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />}
+    {currentExercise && <ExercisePanel exercise={currentExercise} exerciseIndex={currentIndex} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />}
 
     {exerciseViews.length > 1 && <div className="exercise-quick-nav">{exerciseViews.map((exercise, index) => <button key={exercise.id} className={`quick-exercise-chip${index === currentIndex ? ' selected' : ''}${exercise.skipped ? ' skipped' : ''}`} onClick={() => void mutate(current => { current.currentExerciseIndex = index; })}>{index + 1}. {exercise.name}</button>)}</div>}
 
@@ -183,11 +221,12 @@ export function SessionPage() {
   </div>;
 }
 
-function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInputChange, onAdjustSet, onCompleteSet, onAddSet, onDeleteSet, onSkipExercise }: {
+function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInputChange, onAdjustSet, onSaveSets, onCompleteSet, onAddSet, onDeleteSet, onSkipExercise }: {
   exercise: WorkoutSessionExercise; exerciseIndex: number; sessions: WorkoutSession[];
-  draftInputs: Record<string, { weight?: string; reps?: string }>;
+  draftInputs: Record<string, SetInput>;
   onInputChange: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
   onAdjustSet: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', delta: number) => void;
+  onSaveSets: () => void;
   onCompleteSet: (exerciseIndex: number, setIndex: number) => void;
   onAddSet: (exerciseIndex: number) => void;
   onDeleteSet: (exerciseIndex: number, setIndex: number) => void;
@@ -209,6 +248,8 @@ function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInput
           <div className="set-stepper-control reps-stepper-control"><button className="step-button" aria-label="减少 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', -1)}>−</button><label><span className="sr-only">次数</span><input className="set-input reps-input" type="number" inputMode="numeric" min="1" step="1" value={draftInputs[set.id]?.reps ?? set.reps} onChange={event => onInputChange(exerciseIndex, setIndex, 'reps', event.target.value)} /></label><button className="step-button" aria-label="增加 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', 1)}>＋</button><span className="set-unit">次</span></div>
         </div>
       </div>)}
+      <button className="secondary-button full-button" onClick={onSaveSets}>保存组数据</button>
+      <p className="muted small">完成一组时也会保存本组数据。</p>
       <button className="add-set" onClick={() => onAddSet(exerciseIndex)}>＋ 添加一组</button>
       <button className="skip-exercise" onClick={() => onSkipExercise(exerciseIndex)}>跳过动作</button>
     </>}

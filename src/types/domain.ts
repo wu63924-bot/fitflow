@@ -1,6 +1,6 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-export type ExerciseCategory = '胸' | '背' | '肩' | '二头' | '三头' | '腿' | '核心' | '有氧' | '其他';
+export type ExerciseCategory = '胸' | '背' | '肩' | '二头' | '三头' | '腿' | '腹部' | '核心' | '有氧' | '其他';
 
 export interface User {
   name: string;

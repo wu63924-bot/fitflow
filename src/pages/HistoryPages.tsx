@@ -11,8 +11,9 @@ import { getMealsForDate } from '../repositories/mealRepository';
 import { calculateMealItem, sumNutrition } from '../utils/nutrition';
 import { listTrainingPlans } from '../repositories/trainingPlanRepository';
 import { deleteWorkoutSession, listCompletedSessions, listWorkoutSessions } from '../repositories/workoutRepository';
-import { copyWorkoutToDate, DailyScheduleConflictError, removeScheduledActivity, startScheduledStrengthWorkout } from '../services/scheduleService';
+import { removeScheduledActivity, startScheduledStrengthWorkout } from '../services/scheduleService';
 import { DailyScheduleSheet } from './DailyScheduleSheet';
+import { CopyWorkoutDialog } from '../components/CopyWorkoutDialog';
 import type { DailySchedule, WorkoutSession } from '../types';
 
 const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
@@ -59,6 +60,9 @@ export function HistoryPage() {
   const toast = useToast();
   const [search, setSearch] = useSearchParams();
   const view = search.get('view') === 'trends' ? 'trends' : 'calendar';
+  const [copySource, setCopySource] = useState<WorkoutSession>();
+  const [showCopyPicker, setShowCopyPicker] = useState(false);
+  const [copySelection, setCopySelection] = useState('');
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const { data, loading, refresh } = useAsyncData(async () => {
     const [sessions, bodyRecords, schedules] = await Promise.all([listCompletedSessions(), listBodyRecords(), listDailySchedules()]);
@@ -81,6 +85,7 @@ export function HistoryPage() {
     if (!markers.has(key)) markers.set(key, { label: '训练', state: 'legacy', description: '力量训练记录' });
   }
   const cells = monthCells(month, markers);
+  const copyableSessions = data.sessions.filter(session => sessionDate(session) < today);
   const completedCardio = data.schedules.filter(schedule => schedule.type === 'cardio' && schedule.status === 'completed' && schedule.date.startsWith(monthPrefix));
   const monthCount = monthSessions.length + completedCardio.length;
   return <div className="page">
@@ -98,15 +103,19 @@ export function HistoryPage() {
         </button>)}</div>
         <div className="calendar-legend"><span className="calendar-legend-item"><i className="calendar-mark mark-strength">力</i>计划力量</span><span className="calendar-legend-item"><i className="calendar-mark mark-cardio">有</i>计划有氧</span><span className="calendar-legend-item"><i className="calendar-mark mark-rest">休</i>休息</span><span className="calendar-legend-item"><i className="calendar-mark mark-strength-complete">✓</i>已完成</span></div>
       </section>
+      <button className="secondary-button full-button" onClick={() => { setCopySelection(copyableSessions[0]?.id ?? ''); setShowCopyPicker(true); }}>从历史复制到今天</button>
       <section className="section">
         <SectionTitle title="本月训练" action={`${monthCount} 次`} />
         {monthCount ? <div className="card record-list">
-          {monthSessions.map(session => <div className="history-record list-item" key={session.id}>
+          {monthSessions.map(session => <div className={`history-record list-item${sessionDate(session) < today ? ' history-record-with-copy' : ''}`} key={session.id}>
             <button className="history-record-open" onClick={() => navigate(`/history/${sessionDate(session)}`)}>
               <span><strong className="record-date">{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date(sessionDate(session)))}</strong><small className="record-title">{session.workoutDayName} · {Math.round(((session.endedAt ?? session.startedAt) - session.startedAt) / 60000)} min</small></span>
               <span className="record-sets">{countCompletedSets(session)} 组　›</span>
             </button>
-            <button className="history-delete" aria-label={`删除${session.workoutDayName}训练记录`} onClick={() => void onDeleteSession(session)}>删除</button>
+            <div className="history-record-actions">
+              {sessionDate(session) < today && <button className="history-copy" aria-label={`复制${sessionDate(session)}的${session.workoutDayName}到今天`} onClick={() => setCopySource(session)}>复制到今天</button>}
+              <button className="history-delete" aria-label={`删除${session.workoutDayName}训练记录`} onClick={() => void onDeleteSession(session)}>删除</button>
+            </div>
           </div>)}
           {completedCardio.map(schedule => <div className="history-record list-item" key={schedule.id}>
             <button className="history-record-open" onClick={() => navigate(`/history/${schedule.date}`)}><span><strong className="record-date">{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(new Date(`${schedule.date}T12:00:00`))}</strong><small className="record-title">{schedule.cardioData?.activity ?? '有氧'} · {schedule.cardioData?.actualDurationMinutes ?? 0} min</small></span><span className="record-sets">有氧　›</span></button>
@@ -114,6 +123,16 @@ export function HistoryPage() {
         </div> : <EmptyState title="这个月还没有训练记录">点日期安排训练。完成一场训练后，打开那天的记录即可复制到今天。</EmptyState>}
       </section>
     </> : <Suspense fallback={<div className="loading-state">正在读取趋势…</div>}><TrendsPanel /></Suspense>}
+    {showCopyPicker && <Modal title="选择历史训练" onClose={() => setShowCopyPicker(false)}>
+      {copyableSessions.length ? <>
+        <label className="field-label">历史训练记录<select className="text-input" value={copySelection} onChange={event => setCopySelection(event.target.value)}>
+          {copyableSessions.map(session => <option key={session.id} value={session.id}>{sessionDate(session)} · {session.workoutDayName} · {session.exercises.length} 个动作</option>)}
+        </select></label>
+        <p className="muted small">可选择其他月份的已完成力量训练，复制到今天后再开始训练。</p>
+        <button className="primary-button full-button" disabled={!copySelection} onClick={() => { setCopySource(copyableSessions.find(session => session.id === copySelection)); setShowCopyPicker(false); }}>复制选中训练</button>
+      </> : <EmptyState title="还没有可复制的历史训练">完成一次力量训练后，可在之后的日期将它复制到今天。</EmptyState>}
+    </Modal>}
+    {copySource && <CopyWorkoutDialog session={copySource} onClose={() => { setCopySource(undefined); void refresh(); }} />}
   </div>;
 }
 
@@ -122,7 +141,7 @@ export function DayDetailPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [sheetView, setSheetView] = useState<'menu' | 'note' | 'cardio-log'>();
-  const [copied, setCopied] = useState(false);
+  const [copySource, setCopySource] = useState<WorkoutSession>();
   const parsedDate = new Date(`${date}T12:00:00`);
   const validDate = !Number.isNaN(parsedDate.getTime()) && dateKey(parsedDate) === date;
   const { data, loading, refresh } = useAsyncData(async () => {
@@ -144,29 +163,7 @@ export function DayDetailPage() {
     catch (error) { toast(error instanceof Error ? error.message : '删除安排失败'); }
   }
 
-  async function copyToToday(session: WorkoutSession) {
-    const today = dateKey(new Date());
-    const exerciseCount = session.exercises.length;
-    const setCount = session.exercises.reduce((total, exercise) => total + exercise.sets.length, 0);
-    if (!window.confirm(`复制训练到今天？\n来源：${date.slice(5).replace('-', '月')}日 · ${session.workoutDayName}\n复制内容：${exerciseCount} 个动作 · ${setCount} 组`)) return;
-    try {
-      await copyWorkoutToDate(session.id, today);
-      setCopied(true);
-      await refresh();
-    } catch (error) {
-      if (error instanceof DailyScheduleConflictError && error.kind === 'existing') {
-        const current = await getDailySchedule(today);
-        const name = current?.type === 'strength' ? current.workoutTemplate?.workoutDayName : current?.type === 'cardio' ? '有氧训练' : current?.type === 'rest' ? '休息日' : '其他安排';
-        if (!window.confirm(`今天已经有训练安排：${name ?? '力量训练'}。\n替换今天的安排？`)) return;
-        try { await copyWorkoutToDate(session.id, today, true); setCopied(true); await refresh(); }
-        catch (replaceError) { toast(replaceError instanceof Error ? replaceError.message : '复制失败'); }
-        return;
-      }
-      toast(error instanceof Error ? error.message : '复制训练失败');
-    }
-  }
-
-  async function startCopiedWorkout() {
+  async function startTodayWorkout() {
     try {
       const session = await startScheduledStrengthWorkout(dateKey(new Date()));
       navigate(`/workout/session/${session.id}`);
@@ -194,7 +191,7 @@ export function DayDetailPage() {
       {data.schedule.type === 'strength' && data.schedule.workoutTemplate?.exercises.map((exercise, index) => <div className="scheduled-exercise-row" key={`${exercise.exerciseId}-${index}`}><strong>{index + 1}. {exercise.name}</strong><span>{exercise.sets.length} 组 · {exercise.sets.map(set => `${set.weight}×${set.reps}`).join(' / ')} · 休息 {exercise.restSeconds}s</span></div>)}
       {data.schedule.type === 'cardio' && data.schedule.cardioData?.note && <p className="schedule-cardio-note">{data.schedule.cardioData.note}</p>}
       <div className="daily-schedule-actions">
-        {data.schedule.type === 'strength' && data.schedule.status === 'planned' && isToday && <button className="primary-button" onClick={() => void startCopiedWorkout()}>开始训练</button>}
+        {data.schedule.type === 'strength' && data.schedule.status === 'planned' && isToday && <button className="primary-button" onClick={() => void startTodayWorkout()}>开始训练</button>}
         {data.schedule.type === 'strength' && data.schedule.status === 'in_progress' && data.schedule.workoutSessionId && <button className="primary-button" onClick={() => navigate(`/workout/session/${data.schedule?.workoutSessionId}`)}>继续训练</button>}
         {data.schedule.type === 'cardio' && data.schedule.status === 'planned' && isToday && <button className="primary-button" onClick={() => setSheetView('cardio-log')}>记录有氧完成</button>}
         {data.schedule.status === 'planned' && !isPast && <button className="secondary-button" onClick={() => setSheetView('menu')}>编辑安排</button>}
@@ -211,7 +208,7 @@ export function DayDetailPage() {
       </div>)}
       <div className="history-actions">
         {session.status === 'completed' && <button className="text-button" onClick={() => navigate(`/workout/report/${session.id}`)}>查看训练报告</button>}
-        {session.status === 'completed' && !isToday && <button className="secondary-button" onClick={() => void copyToToday(session)}>复制到今天</button>}
+        {session.status === 'completed' && isPast && <button className="secondary-button" onClick={() => setCopySource(session)}>复制到今天</button>}
         <button className="history-delete" onClick={() => void onDeleteSession(session)}>删除记录</button>
       </div>
     </article>)}
@@ -234,10 +231,6 @@ export function DayDetailPage() {
     </section>
 
     {sheetView && <DailyScheduleSheet date={date} schedule={data.schedule} plans={data.plans} exercises={data.exercises} allowTraining={!isPast && !hasWorkoutRecord} initialView={sheetView} onClose={() => setSheetView(undefined)} onSaved={() => void refresh()} />}
-    {copied && <Modal title="已复制到今天" onClose={() => setCopied(false)}>
-      <p className="muted">训练动作与参数已复制，所有组都处于未完成状态。</p>
-      <button className="primary-button full-button" onClick={() => void startCopiedWorkout()}>开始今天的训练</button>
-      <button className="secondary-button full-button" onClick={() => { setCopied(false); toast('训练已安排，稍后可以开始'); }}>稍后训练</button>
-    </Modal>}
+    {copySource && <CopyWorkoutDialog session={copySource} onClose={() => { setCopySource(undefined); void refresh(); }} />}
   </div>;
 }

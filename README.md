@@ -25,7 +25,22 @@ npm run build
 npm run preview
 ```
 
-`dist/` is static output. Configure the static host to serve `index.html` for application routes. `public/_redirects` provides the SPA fallback format used by Netlify; other hosts may need their equivalent rewrite.
+`dist/` is static output. Configure the static host to serve `index.html` for application routes. For Cloudflare Workers static assets, retain the existing SPA fallback configuration (for example, `assets.not_found_handling: "single-page-application"`).
+
+## GitHub Pages build
+
+```sh
+npm run build:github
+npm run preview -- --mode github
+```
+
+Open `http://localhost:4173/fitflow/` to preview. The `github` Vite mode uses `/fitflow/`; ordinary development and `npm run build` use `/`. Both commands write to `dist/`, so build for the intended host before using that output. The GitHub Pages target is `https://wu63924-bot.github.io/fitflow/`.
+
+React Router reads `import.meta.env.BASE_URL` as its basename. Internal route paths stay unchanged; generated links include the deployment prefix. Vite applies the same base to HTML, assets, the manifest link, and service-worker registration. The manifest's `start_url`, `scope`, and icons use that base; the worker is registered at `/fitflow/sw.js` with scope `/fitflow/` for GitHub Pages. It precaches the app shell and static resources without runtime API caching.
+
+The GitHub build also copies `index.html` to `404.html` and writes `.nojekyll`. Publish the complete contents of `dist/` at the repository site's root, including these files. GitHub Pages uses `404.html` for direct visits to client-side paths such as `/fitflow/history`; React Router then renders that page at its original URL. The initial response has HTTP 404 status, although the app loads. After service-worker activation, navigation can use the cached app shell. Vite preview has an SPA fallback, so it does not reproduce this initial 404 status.
+
+`.github/workflows/deploy-pages.yml` builds and deploys on pushes to `main` and supports manual dispatch. It uses Node 22, `npm ci`, and `npm run build:github`, then uploads `dist/` through the official Pages Actions. Set the repository's Settings → Pages → Source to GitHub Actions before the first run. Verify installation on HTTPS after deployment; localhost verification does not establish physical-device installation. IndexedDB schema and database name are unchanged. Cloudflare and GitHub Pages are different origins, so transfer existing local data with the backup export/import flow if needed.
 
 ## Local database
 

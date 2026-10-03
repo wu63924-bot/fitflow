@@ -24,7 +24,9 @@ export const defaultNutritionTarget: StoredNutritionTarget = { ...mockNutritionT
 export async function initializeDatabase(): Promise<void> {
   await db.transaction('rw', [db.trainingPlans, db.exercises, db.foods, db.bodyRecords, db.nutritionTargets, db.settings], async () => {
     if (await db.trainingPlans.count() === 0) await db.trainingPlans.put(clonePlan());
-    if (await db.exercises.count() === 0) await db.exercises.bulkPut(mockExercises.map(exercise => ({ ...exercise })));
+    // Supplement existing installations without replacing custom definitions or historical references.
+    const existingExerciseIds = new Set(await db.exercises.toCollection().primaryKeys());
+    await db.exercises.bulkAdd(mockExercises.filter(exercise => !existingExerciseIds.has(exercise.id)));
     for (const food of builtinFoods) if (!await db.foods.get(food.id)) await db.foods.add(food);
     if (!await db.nutritionTargets.get('current')) await db.nutritionTargets.put(defaultNutritionTarget);
     if (!await db.settings.get('app')) await db.settings.put(defaultAppSettings);

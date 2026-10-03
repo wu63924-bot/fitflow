@@ -21,7 +21,7 @@ function App() {
   }, []);
   if (error) return <div className="app-shell boot-error"><ErrorState message={`FitFlow 无法打开本地数据库：${error}`} /></div>;
   if (!ready) return <div className="app-shell"><LoadingState /></div>;
-  return <BrowserRouter>
+  return <BrowserRouter basename={import.meta.env.BASE_URL}>
     <AppShell>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />

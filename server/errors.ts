@@ -1,4 +1,6 @@
 const definitions = {
+  RATE_LIMITED: [429, '请求过于频繁，请稍后再试'],
+  BUSY: [429, '识别服务繁忙，请稍后再试'],
   INVALID_IMAGE: [400, '请选择有效且非空的食物图片'],
   IMAGE_TOO_LARGE: [413, '图片过大，请压缩至 1 MB 以内'],
   UNSUPPORTED_IMAGE: [415, '仅支持 JPEG、PNG、WebP 图片'],

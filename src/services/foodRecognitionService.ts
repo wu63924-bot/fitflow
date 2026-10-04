@@ -46,6 +46,7 @@ export class MockFoodRecognitionProvider implements FoodRecognitionProvider {
 }
 
 const messages: Record<string, string> = {
+  RATE_LIMITED: '操作太频繁，请稍后再试', BUSY: 'AI识别服务繁忙，请稍后再试',
   INVALID_IMAGE: '请选择有效的食物图片', IMAGE_TOO_LARGE: '图片过大，请重新选择', UNSUPPORTED_IMAGE: '仅支持 JPEG、PNG、WebP 图片',
   AI_TIMEOUT: '识别时间过长，请重新尝试', AI_AUTH_ERROR: 'AI 服务配置异常', AI_RATE_LIMIT: 'AI 服务当前繁忙，请稍后再试',
   AI_BAD_RESPONSE: '本次识别结果异常，请重新拍摄或重试', AI_UNAVAILABLE: 'AI 服务暂时不可用，请稍后再试', INTERNAL_ERROR: '识别服务发生错误，请稍后重试'
@@ -62,11 +63,11 @@ export class RemoteFoodRecognitionProvider implements FoodRecognitionProvider {
     try { response = await fetch(`${this.apiUrl}/api/food-recognition`, { method: 'POST', body: form, signal }); }
     catch { signal?.throwIfAborted(); throw new Error('无法连接识别服务，请稍后重试'); }
     let value: unknown;
-    try { value = await response.json(); } catch { signal?.throwIfAborted(); throw new Error(messages.AI_BAD_RESPONSE); }
+    try { value = await response.json(); } catch { signal?.throwIfAborted(); throw new Error(response.status === 429 ? messages.RATE_LIMITED : messages.AI_BAD_RESPONSE); }
     if (!response.ok) {
       const error = value && typeof value === 'object' && 'error' in value ? value.error : undefined;
-      const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : '';
-      throw new Error(messages[code] || messages.AI_UNAVAILABLE);
+      const code = typeof error === 'string' ? error : error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : '';
+      throw new Error(messages[code] || (response.status === 429 ? messages.RATE_LIMITED : messages.AI_UNAVAILABLE));
     }
     if (!value || typeof value !== 'object' || !('foods' in value) || !Array.isArray(value.foods) || value.foods.length > 20) throw new Error(messages.AI_BAD_RESPONSE);
     const estimates = value.foods.map((row: unknown) => {

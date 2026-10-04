@@ -90,7 +90,7 @@ await test('exact production/development CORS allowlist', () => {
 });
 
 const logs = [];
-const server = createApiServer(config, async () => result(), entry => logs.push(entry));
+const server = createApiServer({ ...config, rateLimitMax: 100 }, async () => result(), entry => logs.push(entry));
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 try {

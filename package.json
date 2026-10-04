@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "dev:api": "node --env-file-if-exists=.env --experimental-strip-types server/index.ts",
     "typecheck:api": "tsc --project tsconfig.server.json",
-    "test:recognition": "node scripts/test-food-recognition.mjs && node --experimental-strip-types scripts/test-food-recognition-api.mjs",
+    "test:recognition": "node scripts/test-food-recognition.mjs && node --experimental-strip-types scripts/test-food-recognition-api.mjs && node --experimental-strip-types scripts/test-api-protection.mjs",
     "build:api": "tsc --project tsconfig.server.build.json && node scripts/package-api.mjs",
     "start:api": "node --env-file-if-exists=.env api-dist/index.js"
   },

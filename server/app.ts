@@ -4,6 +4,7 @@ import type { ApiConfig } from './config.ts';
 import { ApiError } from './errors.ts';
 import { maxImageBytes, validateImage } from './image.ts';
 import { recognizeWithQwen } from './qwenVisionClient.ts';
+import { clientKey, RateLimiter } from './rateLimiter.ts';
 
 const allowedOrigins = new Set([
   'https://wu63924-bot.github.io',
@@ -28,6 +29,8 @@ async function readForm(req: IncomingMessage) {
   catch { throw new ApiError('INVALID_IMAGE'); }
 }
 export function createApiServer(config: ApiConfig, request: typeof fetch = fetch, log: (entry: object) => void = entry => console.info(JSON.stringify(entry))) {
+  const limiter = new RateLimiter(config.rateLimitMax ?? 6, config.rateLimitWindowMs ?? 60000);
+  let active = 0;
   const server = createServer(async (req, res) => {
     const started = Date.now();
     const controller = new AbortController();
@@ -50,6 +53,7 @@ export function createApiServer(config: ApiConfig, request: typeof fetch = fetch
     let foodCount = 0;
     let aiDurationMs = 0;
     try {
+      if (!limiter.allow(clientKey(req.headers['x-forwarded-for']))) { req.resume(); throw new ApiError('RATE_LIMITED'); }
       const form = await readForm(req);
       if (form.getAll('image').length !== 1) throw new ApiError('INVALID_IMAGE');
       const image = await validateImage(form.get('image'));
@@ -57,16 +61,19 @@ export function createApiServer(config: ApiConfig, request: typeof fetch = fetch
       if (hint !== null && (typeof hint !== 'string' || hint.length > 500)) throw new ApiError('INVALID_IMAGE');
       const aiStart = Date.now();
       let result;
+      if (active >= (config.maxConcurrent ?? 2)) throw new ApiError('BUSY');
+      controller.signal.throwIfAborted();
+      active++;
       try { result = await recognizeWithQwen(image, typeof hint === 'string' ? hint.trim() : '', config, controller.signal, request); }
-      finally { aiDurationMs = Date.now() - aiStart; }
+      finally { active--; aiDurationMs = Date.now() - aiStart; }
       foodCount = result.foods.length;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(JSON.stringify(result));
     } catch (reason) {
       const error = reason instanceof ApiError ? reason : new ApiError('INTERNAL_ERROR');
       status = error.status; code = error.code;
-      if (!res.destroyed) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: { code, message: error.message } })); }
-    } finally { log({ time: new Date().toISOString(), durationMs: Date.now() - started, status, code, aiDurationMs, foodCount }); }
+      if (!res.destroyed) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(status === 429 ? { error: code, message: error.message } : { error: { code, message: error.message } })); }
+    } finally { log(status === 429 ? { rate_limited: true } : { time: new Date().toISOString(), durationMs: Date.now() - started, status, code, aiDurationMs, foodCount }); }
   });
   server.requestTimeout = 10000;
   server.headersTimeout = 10000;

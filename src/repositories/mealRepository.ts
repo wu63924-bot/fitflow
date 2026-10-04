@@ -32,6 +32,25 @@ export async function addFoodToMeal(date: string, type: MealType, food: Food, am
   });
 }
 
+export async function addMealItems(date: string, type: MealType, items: MealItem[]): Promise<StoredMeal> {
+  assertNotFuture(date);
+  if (!items.length) throw new Error('请至少添加一种食物');
+  items.forEach(item => withAmount(item, item.amount));
+  return db.transaction('rw', db.meals, async () => {
+    const meal = await getStoredMeal(date, type);
+    // Stable draft IDs make retries idempotent within the selected meal.
+    const existing = new Set(meal.items.map(item => item.id));
+    for (const item of items) {
+      if (existing.has(item.id)) continue;
+      meal.items.push(cloneItem(item, false));
+      existing.add(item.id);
+    }
+    meal.updatedAt = Date.now();
+    await db.meals.put(meal);
+    return meal;
+  });
+}
+
 export async function removeFoodFromMeal(date: string, type: MealType, itemId: string): Promise<{ item: MealItem; index: number } | undefined> {
   const meal = await findStoredMeal(date, type);
   if (!meal) return undefined;

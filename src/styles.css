@@ -504,3 +504,104 @@ img { display: block; max-width: 100%; }
 .history-record-with-copy .history-record-open { flex-basis: 100%; }
 .history-record-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
 .history-copy { min-height: 44px; border: 0; border-radius: 9px; padding: 0 12px; background: var(--green-pale); color: var(--green); font-size: 12px; font-weight: 650; }
+
+.recognition-controls { min-width: 0; margin: 0; padding: 0; border: 0; }
+.recognition-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.recognition-inputs .upload-zone { min-width: 0; padding: 16px 10px; }
+.recognition-inputs input { max-width: 100%; min-height: 44px; }
+.recognition-page .photo-preview { margin-top: 14px; padding: 12px; }
+.recognition-page .photo-preview img { object-fit: contain; }
+.recognition-summary, .recognition-food, .recognition-add { margin-top: 16px; padding: 16px; }
+.recognition-summary h2, .recognition-food h2 { margin: 0; font-size: 16px; }
+.recognition-summary > strong { display: block; margin-top: 12px; color: var(--green); font-size: 28px; }
+.recognition-summary p, .recognition-nutrients { font-size: 12px; line-height: 1.7; }
+.recognition-warning { border-radius: 9px; padding: 10px; color: #8a5a12; background: #fff5df; font-size: 12px; }
+.recognition-food { padding: 8px 12px; }
+.recognition-food-row { display: flex; align-items: center; gap: 10px; }
+.recognition-food-line { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; font-size: 12px; }
+.recognition-food-line > * { flex-shrink: 0; }
+.recognition-food-line > strong { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.recognition-source { flex-shrink: 0; color: var(--green); font-size: 11px; white-space: nowrap; }
+.recognition-food-row > button { flex-shrink: 0; min-height: 44px; padding: 0; font-size: 12px; }
+.recognition-food-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding: 8px 0; }
+.recognition-food-edit > p, .recognition-food-edit > .field-label:first-of-type { grid-column: 1 / -1; }
+.recognition-food-edit > p { margin: 0; }
+.recognition-food-edit .field-label { min-width: 0; margin: 0; }
+.recognition-page .full-button { margin-top: 12px; }
+@media (max-width: 360px) { .recognition-inputs { grid-template-columns: 1fr; } }
+
+/* Keep the nutrition workspace compact without changing other tabs. */
+.nutrition-page { padding: max(18px, env(safe-area-inset-top)) 18px calc(106px + env(safe-area-inset-bottom)); }
+.nutrition-page .card { border-radius: 14px; box-shadow: none; }
+.nutrition-page .section { margin-top: 20px; }
+.nutrition-page .section-title { font-size: 15px; }
+.nutrition-page .section-head { min-height: 40px; }
+.nutrition-page .text-button, .nutrition-page .section-action { min-height: 44px; }
+.nutrition-page .page-title { font-size: 24px; }
+.nutrition-page .back-header { margin-bottom: 16px; }
+.diet-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 12px; }
+.diet-header .page-title { margin: 0; font-size: 23px; letter-spacing: 0; }
+.diet-date { display: flex; align-items: center; gap: 2px; }
+.diet-date > .text-button { width: 30px; font-size: 22px; }
+.diet-date .date-today-button { font-size: 12px; }
+.diet-page .nutrition-overview { margin-top: 10px; padding: 16px; }
+.diet-page .value { display: inline-block; margin-top: 5px; font-size: 32px; }
+.diet-page .calorie-track { height: 5px; margin-top: 12px; }
+.diet-macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; gap: 10px; }
+.diet-macros > div { display: grid; gap: 5px; font-size: 12px; }
+.diet-macros > div > span { color: #59665e; }
+.diet-macros strong { font-size: 16px; font-weight: 650; }
+.diet-macros small { color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.diet-add-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.diet-add-actions > button { min-height: 44px; border-radius: 10px; font-size: 14px; }
+.diet-meal-list { margin-top: 4px; border-radius: 14px; background: white; padding: 0 16px; }
+.diet-meal-list .meal-card { margin: 0; padding: 12px 0; border-top: 1px solid var(--line); }
+.diet-meal-list .meal-card:first-child { border-top: 0; }
+.diet-meal-head { display: flex; align-items: center; gap: 12px; }
+.diet-meal-name { flex: 1; display: grid; gap: 4px; }
+.diet-meal-name > small { color: var(--muted); font-size: 11px; }
+.diet-meal-head .meal-calories { color: #59665e; font-weight: 400; }
+.diet-page .meal-empty { margin: 0 0 6px; font-size: 12px; }
+.diet-page .meal-foods { margin-top: 0; }
+.diet-page .meal-food-row { min-height: 52px; }
+.diet-page .meal-food-copy strong { font-weight: 500; line-height: 1.4; }
+.diet-page .meal-food-copy small { line-height: 1.4; }
+.diet-meal-more { position: relative; color: var(--muted); font-size: 12px; }
+.diet-meal-more summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none; }
+.diet-meal-more summary::-webkit-details-marker { display: none; }
+.diet-meal-more summary:focus-visible { outline: 3px solid rgba(25, 122, 85, .2); outline-offset: 2px; }
+.diet-meal-more summary::after { content: '⌄'; margin-left: 6px; }
+.diet-meal-more[open] summary::after { content: '⌃'; }
+.diet-meal-more .meal-buttons { position: absolute; z-index: 25; top: 100%; right: 0; display: grid; gap: 0; min-width: 150px; margin: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: var(--shadow); }
+.diet-meal-more .meal-action { min-height: 44px; text-align: left; font-size: 12px; }
+.diet-item-editor { grid-column: 1 / -1; padding: 8px 0 12px; }
+.diet-item-editor .meal-amount-editor { margin: 0; }
+.diet-item-tools { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.diet-item-tools > label { display: grid; gap: 6px; color: #59665e; font-size: 12px; }
+.diet-item-tools select { min-width: 110px; }
+.nutrition-picker-heading { margin: -8px 0 4px; }
+.nutrition-search-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 10px; }
+.nutrition-search-row .field-label, .nutrition-search-row .food-category-select { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 0; color: #59665e; font-size: 12px; }
+.nutrition-search-row select { min-width: 0; }
+.food-picker-page .food-tabs { margin-top: 14px; }
+.food-picker-page .food-tab { min-height: 40px; }
+.nutrition-food-list { overflow: hidden; border-radius: 14px; background: white; }
+.nutrition-food-entry + .nutrition-food-entry { border-top: 1px solid var(--line); }
+.nutrition-food-entry .food-option { margin: 0; padding: 8px 12px; border-radius: 0; }
+.nutrition-food-entry .food-pick { min-width: 0; min-height: 48px; }
+.nutrition-food-entry .food-pick strong { font-size: 14px; font-weight: 550; }
+.nutrition-food-entry .food-pick small { font-size: 11px; }
+.nutrition-food-entry .food-option-actions { flex-shrink: 0; }
+.nutrition-food-entry .selected-food-card { margin: 0 12px 12px; padding: 14px; background: #f3f7f4; }
+.nutrition-page .food-preview-nutrients { gap: 6px; }
+.nutrition-photo-notice { margin: -6px 0 14px; color: #59665e; font-size: 12px; line-height: 1.6; }
+.nutrition-page .recognition-inputs .upload-zone { position: relative; min-height: 84px; padding: 12px; gap: 4px; border-radius: 12px; border: 1px solid #dce8e0; background: white; }
+.nutrition-page .recognition-inputs .upload-zone input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.nutrition-page .recognition-inputs .upload-zone:focus-within { outline: 3px solid rgba(25, 122, 85, .2); outline-offset: 2px; }
+.nutrition-page .photo-preview { padding: 0; overflow: hidden; }
+.nutrition-page .photo-preview img { max-height: 180px; border-radius: 14px; }
+.nutrition-page .recognition-summary { padding: 14px; }
+.nutrition-page .recognition-summary > strong { margin-top: 8px; font-size: 24px; }
+.nutrition-page .recognition-summary p { margin: 6px 0; }
+.nutrition-page .recognition-food { margin-top: 8px; }
+.nutrition-page .recognition-controls > .field-label { margin: 14px 0 8px; }

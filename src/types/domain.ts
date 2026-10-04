@@ -144,6 +144,7 @@ export type FoodUnit = 'g' | 'ml' | '个';
 export type MealAmountUnit = FoodUnit | '份';
 
 export interface Food {
+  aliases?: string[];
   id: string;
   name: string;
   category: FoodCategory;
@@ -170,6 +171,7 @@ export interface NutritionSnapshot {
 }
 
 export interface MealItem {
+  nutritionSource?: 'ai';
   id: string;
   foodId: string;
   foodNameSnapshot: string;

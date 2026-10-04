@@ -92,7 +92,7 @@ The Vite PWA plugin generates a standalone manifest and service worker. The work
 ## Current limits
 
 - Browser storage is isolated by browser and site origin, including different ports on the same computer. Data can be transferred with a FitFlow backup file.
-- Photo selection and preview are implemented, with manual food selection. No AI request is made.
+- Production AI photo recognition uses a local Mock provider: choose a JPEG/PNG/WebP image, review and edit the demo foods and gram weights, then save to the existing meal records. Images are compressed to at most 1600 px on the longest side and 1 MB; originals above 20 MB or 60 megapixels are rejected. HEIC needs conversion. No image is uploaded or stored in IndexedDB, and no real AI request is made. See [Phase 6A acceptance](docs/phase6a-acceptance.md).
 - Training counts, durations, calendars, and session details use IndexedDB records. The capacity percentage trend remains the existing Mock sample.
 - Browser sound and notification behavior is not implemented. Vibration is attempted only when `navigator.vibrate` exists and is enabled.
 
@@ -101,3 +101,23 @@ The Vite PWA plugin generates a standalone manifest and service worker. The work
 入口为“日历 → 趋势”，直接地址 `/history?view=trends`。统计读取现有 IndexedDB，默认最近 30 天；图表无需外部依赖，支持离线。
 
 计算口径、测试结果、已知边界与人工验收步骤见 [Phase 4 验收报告](docs/phase4-acceptance.md)。分析层断言运行：`node scripts/test-analytics.mjs`（Node 24）。
+
+## Phase 6B-1：本地 Qwen 食物识别
+
+本阶段仅增加本地 API。真实 Qwen 验收需自行在本地配置凭据；本轮已完成模拟测试，未部署。推荐 Node 22.18+ 或 Node 24。
+
+在本项目目录（`C:\Users\wy\Documents\ChatGPT\健身小程序\web`）：
+
+1. `Copy-Item .env.example .env`，在本地编辑被 Git 忽略的 `.env`。
+2. 填写后端 `DASHSCOPE_API_KEY`、实际北京工作空间 `QWEN_BASE_URL`；模型默认 `qwen3-vl-flash`。不要在聊天、前端变量或 Git 中放 Key。
+3. 将 `VITE_FOOD_RECOGNITION_PROVIDER` 改为 `remote`，公开 API 地址为 `VITE_FOOD_RECOGNITION_API_URL=http://localhost:8788`。
+4. 终端 A：`npm run dev:api`；终端 B：`npm run dev`。更改环境后重启。
+5. 打开 Vite 显示的本地 URL，饮食 → AI 拍照识别 → 选择真实餐食照片 → 识别 → 确认 AI估算的名称、重量与整份营养 → 保存。
+
+本地 API 使用 Node 原生 HTTP，仅监听 `127.0.0.1:8788`，路由 `POST /api/food-recognition`。图片只在内存用于本次调用，不保存原图；AI 路径直接返回名称、克数、整份热量/蛋白质/碳水/脂肪与置信度，不匹配本地 Food 库。确认后直接保存营养快照，并标记“AI估算”；手动添加仍使用本地 Food 库。重量和营养独立编辑，修改重量不自动修改整份营养。
+
+将 provider 改回 `mock` 并重启前端即可回退。**本阶段 `build` 和 `build:github` 均强制 Mock**，开发环境的 Remote 设置不会使静态站点请求 localhost。GitHub `/fitflow/` 和 Cloudflare `/` 构建方式保持原样。公网 Remote 留待 Phase 6B-2。
+
+验证命令：`npm run typecheck`、`npm run typecheck:api`、`npm run test:recognition`、`npm run build`、`npm run build:github`。
+
+当前 AI 直接营养快照流程、73 项接口检查和浏览器回归结果见 [AI 食物识别简化验收](docs/ai-food-simplification-acceptance.md)。早期 [Phase 6B-1 报告](docs/phase6b1-acceptance.md) 中的 Food 匹配流程已被本次简化替代。本地 API 需要重启才会使用新 Prompt 和七字段响应校验。

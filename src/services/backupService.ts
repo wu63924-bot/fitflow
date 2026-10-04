@@ -163,7 +163,8 @@ function isMealItem(value: unknown): boolean {
   const snapshot = value.nutritionSnapshot;
   return ['calories', 'protein', 'carbs', 'fat'].every(key => finite(snapshot[key]) && snapshot[key] >= 0)
     && finite(snapshot.referenceAmount) && snapshot.referenceAmount > 0 && isMealAmountUnit(snapshot.referenceUnit)
-    && (snapshot.gramsPerUnit === undefined || (finite(snapshot.gramsPerUnit) && snapshot.gramsPerUnit > 0));
+    && (snapshot.gramsPerUnit === undefined || (finite(snapshot.gramsPerUnit) && snapshot.gramsPerUnit > 0))
+    && (value.nutritionSource === undefined || value.nutritionSource === 'ai');
 }
 function isFood(value: unknown): value is Food {
   return isRecord(value) && typeof value.id === 'string' && typeof value.name === 'string' && !!value.name.trim()
@@ -172,7 +173,8 @@ function isFood(value: unknown): value is Food {
     && (value.nutritionUnit === 'g' || value.nutritionUnit === 'ml') && value.nutritionPer === 100
     && ['calories', 'protein', 'carbs', 'fat'].every(key => finite(value[key]) && value[key] >= 0)
     && (value.gramsPerUnit === undefined || (finite(value.gramsPerUnit) && value.gramsPerUnit > 0))
-    && (value.isCustom === undefined || typeof value.isCustom === 'boolean');
+    && (value.isCustom === undefined || typeof value.isCustom === 'boolean')
+    && (value.aliases === undefined || (Array.isArray(value.aliases) && value.aliases.every(alias => typeof alias === 'string' && !!alias.trim() && alias.length <= 60)));
 }
 function isFavoriteFood(value: unknown): value is FavoriteFood {
   return isRecord(value) && typeof value.foodId === 'string' && finite(value.createdAt);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { BackHeader, EmptyState, ErrorState, PageHeader, ProgressRow, SectionTitle, useToast } from '../components/UI';
+import { BackHeader, EmptyState, ErrorState, SectionTitle, useToast } from '../components/UI';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { getFoodPickerData, createCustomFood, markFoodRecent, saveFood, toggleFavoriteFood } from '../repositories/foodRepository';
 import { addFoodToMeal, clearMeal, copyMeal, listMealsForDate, mealOrder, mealTitles, moveFoodToMeal, removeFoodFromMeal, restoreFoodToMeal, updateFoodAmount } from '../repositories/mealRepository';
@@ -95,41 +95,49 @@ export function DietPage() {
   function openFood(type: MealType) { navigate(`/nutrition/add/${type}?date=${date}`); }
   const dateTitle = date === today ? '今日饮食' : `${date.slice(5).replace('-', '月')}日饮食`;
 
-  return <div className="page">
-    <PageHeader eyebrow="NUTRITION" title={dateTitle} subtitle={dateLabel(date)} />
-    <div className="date-switcher card">
-      <button className="month-arrow" aria-label="前一天" onClick={() => setSearchParams({ date: moveDate(date, -1) })}>‹</button>
-      <button className="date-today-button" onClick={() => setSearchParams({ date: today })}>{date === today ? '今天' : date}</button>
-      <button className="month-arrow" aria-label="后一天" onClick={() => setSearchParams({ date: moveDate(date, 1) })}>›</button>
-    </div>
-    <section className="card nutrition-overview">
-      <div className="row-between"><div><strong className="value">{Math.round(data.nutrition.calories)}</strong><span className="unit">/ {data.target.calories} kcal</span></div><span className="tag">目标 {data.target.calories} kcal</span></div>
+  return <div className="page nutrition-page diet-page">
+    <header className="diet-header">
+      <h1 className="page-title">{dateTitle}</h1>
+      <div className="diet-date">
+        <button className="text-button" aria-label="前一天" onClick={() => setSearchParams({ date: moveDate(date, -1) })}>‹</button>
+        <button className="date-today-button" aria-label="返回今天" onClick={() => setSearchParams({ date: today })}>{dateLabel(date)}</button>
+        <button className="text-button" aria-label="后一天" onClick={() => setSearchParams({ date: moveDate(date, 1) })}>›</button>
+      </div>
+    </header>
+    <section className="card nutrition-overview" aria-label="每日营养">
+      <span className="muted small">摄入 / 每日目标</span><div><strong className="value">{Math.round(data.nutrition.calories)}</strong><span className="unit"> / {data.target.calories} kcal</span></div>
       <div className="progress-track calorie-track"><div className="progress-fill" style={{ width: `${progressPercent(data.nutrition.calories, data.target.calories)}%` }} /></div>
-      <ProgressRow label="蛋白质" value={Number(formatMacro(data.nutrition.protein))} target={data.target.protein} unit="g" />
-      <ProgressRow label="碳水" value={Number(formatMacro(data.nutrition.carbs))} target={data.target.carbs} unit="g" />
-      <ProgressRow label="脂肪" value={Number(formatMacro(data.nutrition.fat))} target={data.target.fat} unit="g" />
+      <div className="diet-macros">{([['protein', '蛋白质'], ['carbs', '碳水'], ['fat', '脂肪']] as const).map(([key, label]) => <div key={key}><span>{label}</span><strong>{formatMacro(data.nutrition[key])}<small> / {data.target[key]}g</small></strong></div>)}</div>
     </section>
+    <div className="diet-add-actions">
+      <button className="primary-button" disabled={future} onClick={() => openFood('snack')}>手动添加</button>
+      <button className="secondary-button" disabled={future} onClick={() => navigate(`/nutrition/photo/snack?date=${date}`)}>AI 拍照识别</button>
+    </div>
     {future && <div className="card nutrition-readonly-note">未来日期仅供查看，不能记录已吃食物。</div>}
     <section className="section">
-      <SectionTitle title="用餐记录" action={future ? undefined : '＋ 添加饮食'} onAction={() => openFood('snack')} />
+      <SectionTitle title="用餐记录" />
+      <div className="diet-meal-list">
       {data.meals.map((meal, index) => {
         const totals = sumItems(meal.items);
         const previousType = index > 0 ? mealOrder[index - 1] : undefined;
-        return <article className="meal-card card" key={meal.id}>
-          <div className="row-between"><strong className="meal-title">{mealTitles[meal.type]}</strong><span className="meal-calories">{Math.round(totals.calories)} kcal</span></div>
-          {meal.items.length ? <div className="meal-foods">{meal.items.map(item => <FoodItemRow key={item.id} item={item} date={date} type={meal.type} onRemove={() => void remove(meal.type, item.id)} onChanged={() => void refresh()} toast={toast} disabled={future} />)}</div> : <p className="meal-empty">暂无记录</p>}
-          <div className="meal-buttons">
-            <button className="meal-action" disabled={future} onClick={() => openFood(meal.type)}>＋ 添加食物</button>
-            <button className="meal-action meal-copy" disabled={future} onClick={() => void copy(moveDate(date, -1), meal.type, meal.type)}>复制昨天{mealTitles[meal.type]}</button>
-            {previousType && <button className="meal-action meal-copy" disabled={future || !data.meals[index - 1]?.items.length} onClick={() => void copy(date, previousType, meal.type)}>复制上一餐</button>}
-            {!!meal.items.length && <button className="meal-action meal-clear" disabled={future} onClick={() => void removeMeal(meal.type)}>清空</button>}
+        return <article className="meal-card" key={meal.id}>
+          <div className="diet-meal-head"><div className="diet-meal-name"><strong className="meal-title">{mealTitles[meal.type]}</strong>{!meal.items.length && <small>暂无记录</small>}</div><span className="meal-calories">{Math.round(totals.calories)} kcal</span><button className="text-button" disabled={future} aria-label={`添加${mealTitles[meal.type]}食物`} onClick={() => openFood(meal.type)}>＋ 添加</button>
+            {!future && <details className="diet-meal-more">
+            <summary aria-label={`${mealTitles[meal.type]}更多操作`}>更多</summary>
+            <div className="meal-buttons">
+              <button className="meal-action meal-copy" onClick={() => void copy(moveDate(date, -1), meal.type, meal.type)}>复制昨天{mealTitles[meal.type]}</button>
+              {previousType && <button className="meal-action meal-copy" disabled={!data.meals[index - 1]?.items.length} onClick={() => void copy(date, previousType, meal.type)}>复制上一餐</button>}
+              {!!meal.items.length && <button className="meal-action meal-clear" onClick={() => void removeMeal(meal.type)}>清空本餐</button>}
+            </div>
+          </details>}
           </div>
+          {meal.items.length ? <div className="meal-foods">{meal.items.map(item => <FoodItemRow key={item.id} item={item} date={date} type={meal.type} onRemove={() => void remove(meal.type, item.id)} onChanged={() => void refresh()} toast={toast} disabled={future} />)}</div> : null}
+
+
         </article>;
       })}
+      </div>
     </section>
-    <button className="photo-hint card" onClick={() => navigate(`/nutrition/photo/snack?date=${date}`)}>
-      <span className="ai-mark">✦</span><span><strong className="ai-title">📷 拍照识别（Beta）</strong><small className="ai-text">AI 食物识别将在后续版本启用</small></span><span className="exercise-chevron">›</span>
-    </button>
     {undo && <div className="undo-bar" role="status"><span>已删除食物</span><button onClick={() => void undoRemove()}>撤销</button></div>}
   </div>;
 }
@@ -159,14 +167,13 @@ function FoodItemRow({ item, date, type, onRemove, onChanged, toast, disabled }:
   }
 
   return <div className="meal-food-row meal-food-item">
-    <div className="meal-food-copy"><strong>{item.foodNameSnapshot}</strong><small>{item.amount}{item.unit}{item.unit === '个' && item.nutritionSnapshot.gramsPerUnit ? `（约 ${item.nutritionSnapshot.gramsPerUnit}g/个）` : ''}</small></div>
+    <div className="meal-food-copy"><strong>{item.foodNameSnapshot}</strong><small>{item.amount}{item.unit}{item.nutritionSource === 'ai' ? ' · AI估算' : ''}{item.unit === '个' && item.nutritionSnapshot.gramsPerUnit ? `（约 ${item.nutritionSnapshot.gramsPerUnit}g/个）` : ''}</small></div>
     <span className="muted small">{Math.round(nutrition.calories)} kcal</span>
-    <div className="meal-food-controls">
-      <button className="text-button" disabled={disabled || busy} onClick={() => { setAmount(String(item.amount)); setEditing(value => !value); }}>{editing ? '收起' : '份量'}</button>
-      <select aria-label={`更换${item.foodNameSnapshot}餐次`} disabled={disabled || busy} value={type} onChange={event => void moveTo(event.target.value as MealType)}>{mealOrder.map(mealTypeValue => <option key={mealTypeValue} value={mealTypeValue}>{mealTitles[mealTypeValue]}</option>)}</select>
-      <button className="icon-button danger-icon" aria-label={`删除${item.foodNameSnapshot}`} disabled={disabled || busy} onClick={onRemove}>×</button>
-    </div>
-    {editing && <div className="meal-amount-editor"><label>份量（{item.unit}）<input className="text-input" type="number" min="0.1" max="10000" step="any" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} /></label><button className="secondary-button" disabled={busy} onClick={() => void saveAmount()}>保存</button></div>}
+    <button className="text-button" aria-label={`编辑${item.foodNameSnapshot}`} aria-expanded={editing} disabled={disabled || busy} onClick={() => { setAmount(String(item.amount)); setEditing(value => !value); }}>{editing ? '收起' : '编辑'}</button>
+    {editing && <div className="diet-item-editor">
+      <div className="meal-amount-editor"><label>份量（{item.unit}）<input className="text-input" type="number" min="0.1" max="10000" step="any" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} /></label><button className="secondary-button" disabled={busy} onClick={() => void saveAmount()}>保存</button></div>
+      <div className="diet-item-tools"><label>餐次<select className="text-input" aria-label={`更换${item.foodNameSnapshot}餐次`} disabled={busy} value={type} onChange={event => void moveTo(event.target.value as MealType)}>{mealOrder.map(mealTypeValue => <option key={mealTypeValue} value={mealTypeValue}>{mealTitles[mealTypeValue]}</option>)}</select></label><button className="text-button danger-text" aria-label={`删除${item.foodNameSnapshot}`} disabled={busy} onClick={onRemove}>删除食物</button></div>
+    </div>}
   </div>;
 }
 
@@ -228,30 +235,36 @@ export function AddMealPage() {
     catch (reason) { toast(reason instanceof Error ? reason.message : '收藏失败'); }
   }
 
-  return <div className="page">
-    <BackHeader title={`添加${mealTitles[type]}`} subtitle={`${dateLabel(date)} · 营养数据为估算值`} />
+  return <div className="page nutrition-page food-picker-page">
+    <BackHeader title={`添加${mealTitles[type]}`} subtitle={dateLabel(date)} />
+    <div className="row-between nutrition-picker-heading"><span className="muted small">从食物库选择</span><button className="text-button" disabled={future} onClick={() => navigate(`/nutrition/photo/${type}?date=${date}`)}>改用 AI 拍照</button></div>
     {future && <div className="card nutrition-readonly-note">未来日期可以浏览食物，但不能保存饮食记录。</div>}
-    <label className="field-label">搜索食物<input className="text-input" value={query} onChange={event => setQuery(event.target.value)} placeholder="输入食物名称，例如：鸡蛋" /></label>
-    <div className="food-tabs" role="tablist" aria-label="食物列表">{([['all', '全部'], ['recent', '最近吃过'], ['favorites', '常吃'], ['mine', '我的食物']] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={tab === value} className={tab === value ? 'food-tab active' : 'food-tab'} onClick={() => setTab(value)}>{label}</button>)}</div>
+    <div className="nutrition-search-row"><label className="field-label">搜索食物<input className="text-input" value={query} onChange={event => setQuery(event.target.value)} placeholder="输入食物名称" /></label>
     <label className="food-category-select">分类<select className="text-input" value={category} onChange={event => setCategory(event.target.value as FoodCategory | '全部')}><option value="全部">全部分类</option>{categories.map(value => <option key={value}>{value}</option>)}</select></label>
+    </div>
+    <div className="food-tabs" role="tablist" aria-label="食物列表">{([['all', '全部'], ['recent', '最近'], ['favorites', '常吃'], ['mine', '自定义']] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={tab === value} className={tab === value ? 'food-tab active' : 'food-tab'} onClick={() => setTab(value)}>{label}</button>)}</div>
+
     <section className="section">
       <SectionTitle title={tab === 'recent' ? '最近吃过' : tab === 'favorites' ? '常吃' : tab === 'mine' ? '我的食物' : '本地食物库'} action="＋ 自定义食物" onAction={() => setEditor(null)} />
-      {visibleFoods.map(food => <div className={`food-option card${selectedId === food.id ? ' food-option-selected' : ''}`} key={food.id}>
+      <div className="nutrition-food-list">
+      {visibleFoods.map(food => <div className="nutrition-food-entry" key={food.id}><div className={`food-option${selectedId === food.id ? ' food-option-selected' : ''}`}>
         <button className="food-pick" onClick={() => { setSelectedId(food.id); setAmount(String(food.servingBase)); }}>
-          <strong>{food.name}</strong><small>{food.category} · {food.calories} kcal / 100{food.nutritionUnit} · {food.servingUnit === '个' ? `常用 ${food.servingBase}个（约 ${food.gramsPerUnit}g/个）` : `常用 ${food.servingBase}${food.servingUnit}`}</small>
+          <strong>{food.name}</strong><small>{food.calories} kcal / 100{food.nutritionUnit}</small>
         </button>
         <div className="food-option-actions"><button aria-label={`${data.favorites.includes(food.id) ? '取消收藏' : '收藏'}${food.name}`} onClick={() => void toggleFavorite(food)}>{data.favorites.includes(food.id) ? '★' : '☆'}</button><button onClick={() => setEditor(food)}>编辑</button></div>
-      </div>)}
-      {!visibleFoods.length && <EmptyState title={tab === 'favorites' ? '还没有常吃食物' : tab === 'recent' ? '还没有最近记录' : '没有找到食物'}>可以搜索本地食物，或创建自定义食物。</EmptyState>}
-    </section>
-    {selectedFood && <section className="card selected-food-card">
+      </div>
+    {selectedFood?.id === food.id && <section className="card selected-food-card">
       <div className="row-between"><strong>{selectedFood.name}</strong><span className="muted small">每 100{selectedFood.nutritionUnit} · {selectedFood.calories} kcal</span></div>
       <label className="field-label">食用份量（{selectedFood.servingUnit}）<input className="text-input" type="number" inputMode="decimal" step="any" min="0.1" max="10000" value={amount} onChange={event => setAmount(event.target.value)} /></label>
       {selectedFood.servingUnit === '个' && <p className="muted small">约 {selectedFood.gramsPerUnit}g / 个，实际重量会有差异。</p>}
       {preview && <div className="food-preview-nutrients"><span>{Math.round(preview.calories)} kcal</span><span>蛋白质 {formatMacro(preview.protein)}g</span><span>碳水 {formatMacro(preview.carbs)}g</span><span>脂肪 {formatMacro(preview.fat)}g</span></div>}
       <button className="primary-button full-button" disabled={busy || future} onClick={() => void onAdd()}>{busy ? '保存中…' : `添加到${mealTitles[type]}`}</button>
     </section>}
-    <button className="secondary-button full-button" onClick={() => navigate(`/nutrition/photo/${type}?date=${date}`)}>📷 拍照识别（Beta）</button>
+      </div>)}
+      </div>
+      {!visibleFoods.length && <EmptyState title={tab === 'favorites' ? '还没有常吃食物' : tab === 'recent' ? '还没有最近记录' : '没有找到食物'}>可以搜索本地食物，或创建自定义食物。</EmptyState>}
+    </section>
+
     {editor !== undefined && <FoodEditor initial={editor} onCancel={() => setEditor(undefined)} onSaved={async food => { await refresh(); if (selectedId === food.id) setSelectedId(food.id); setEditor(undefined); toast(editor ? '食物资料已更新' : '自定义食物已保存'); }} />}
   </div>;
 }
@@ -296,28 +309,5 @@ function FoodEditor({ initial, onCancel, onSaved }: { initial: Food | null; onCa
       <div className="food-editor-grid">{([['calories', '热量 kcal'], ['protein', '蛋白质 g'], ['carbs', '碳水 g'], ['fat', '脂肪 g']] as const).map(([key, label]) => <label className="field-label" key={key}>{label}<input className="text-input" type="number" min="0" max="10000" step="any" value={nutrients[key]} onChange={event => setNutrients(value => ({ ...value, [key]: event.target.value }))} required /></label>)}</div>
       <button className="primary-button full-button" disabled={busy}>{busy ? '保存中…' : '保存食物'}</button>
     </form>
-  </div>;
-}
-
-export function FoodPhotoPage() {
-  const { type: rawType } = useParams();
-  const type = mealType(rawType);
-  const [searchParams] = useSearchParams();
-  const date = searchParams.get('date') || dateKey(new Date());
-  const [imageUrl, setImageUrl] = useState('');
-  const navigate = useNavigate();
-  useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
-  return <div className="page">
-    <BackHeader title="拍照识别（Beta）" subtitle="当前版本不调用 AI 服务" />
-    <div className="card nutrition-readonly-note">AI 食物识别将在后续版本启用。所选图片只在当前设备预览，不会上传。</div>
-    <label className="upload-zone">
-      <span className="upload-icon">＋</span><strong>拍照或从相册选择</strong><span className="muted small">支持手机摄像头和本机图片</span>
-      <input type="file" accept="image/*" capture="environment" onChange={event => {
-        const file = event.target.files?.[0];
-        if (file) setImageUrl(URL.createObjectURL(file));
-      }} />
-    </label>
-    {imageUrl && <div className="photo-preview card"><img src={imageUrl} alt="所选食物照片" /><p className="muted small">照片选择已完成。请返回食物库手动确认并添加。</p></div>}
-    <button className="primary-button full-button" onClick={() => navigate(`/nutrition/add/${type}?date=${date}`)}>返回食物库手动选择</button>
   </div>;
 }

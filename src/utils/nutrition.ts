@@ -19,10 +19,10 @@ export function nutritionSnapshotForFood(food: Food): NutritionSnapshot {
   };
 }
 
-export function createMealItem(food: Food, amount: number): MealItem {
+export function createMealItem(food: Food, amount: number, id: string = crypto.randomUUID()): MealItem {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) throw new Error('份量需大于 0 且不超过 10000');
   const item: MealItem = {
-    id: crypto.randomUUID(),
+    id,
     foodId: food.id,
     foodNameSnapshot: food.name,
     amount,
@@ -30,6 +30,11 @@ export function createMealItem(food: Food, amount: number): MealItem {
     nutritionSnapshot: nutritionSnapshotForFood(food)
   };
   return withAmount(item, amount);
+}
+
+export function createMealItemInGrams(food: Food, grams: number, id?: string): MealItem {
+  if (food.nutritionUnit !== 'g') throw new Error('该食物按毫升计算，请在食物库手动记录');
+  return createMealItem({ ...food, servingUnit: 'g' }, grams, id);
 }
 
 export function withAmount(item: MealItem, amount: number): MealItem {

@@ -5,9 +5,12 @@ import { ApiError } from './errors.ts';
 import { maxImageBytes, validateImage } from './image.ts';
 import { recognizeWithQwen } from './qwenVisionClient.ts';
 
-export function isLocalOrigin(origin: string) {
-  try { const url = new URL(origin); return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && Number(url.port) >= 4173 && Number(url.port) <= 5199 && url.origin === origin; } catch { return false; }
-}
+const allowedOrigins = new Set([
+  'https://wu63924-bot.github.io',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
+export function isAllowedOrigin(origin: string) { return allowedOrigins.has(origin); }
 async function readForm(req: IncomingMessage) {
   const type = req.headers['content-type'] || '';
   if (!type.startsWith('multipart/form-data;')) throw new ApiError('INVALID_IMAGE');
@@ -32,9 +35,14 @@ export function createApiServer(config: ApiConfig, request: typeof fetch = fetch
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Vary', 'Origin');
     const origin = req.headers.origin;
-    if (origin && !isLocalOrigin(origin)) { res.writeHead(403).end(); return; }
+    if (origin && !isAllowedOrigin(origin)) { res.writeHead(403).end(); return; }
     if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
-    if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); res.writeHead(204).end(); return; }
+    if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); res.writeHead(204).end(); return; }
+    if (req.url === '/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, service: 'fitflow-ai' }));
+      return;
+    }
     if (req.url !== '/api/food-recognition') { res.writeHead(404).end(); return; }
     if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); res.writeHead(405).end(); return; }
     let status = 200;

@@ -18,9 +18,9 @@ export function createAiMealItem(food: RecognizedFood): MealItem {
 
 function nutrient(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 10000; }
 
-export const recognitionMode = import.meta.env.DEV && import.meta.env.VITE_FOOD_RECOGNITION_PROVIDER === 'remote' ? 'remote' : 'mock';
+export const recognitionMode = import.meta.env.VITE_FOOD_RECOGNITION_PROVIDER === 'remote' ? 'remote' : 'mock';
 export const recognitionNotice = recognitionMode === 'remote'
-  ? '图片将经本地识别服务发送给 AI，仅用于本次识别，不保存原图。食物、重量与营养均为 AI估算，请修改并确认后记录。'
+  ? '图片将经识别服务发送给 AI，仅用于本次识别，不保存原图。食物、重量与营养均为 AI估算，请修改并确认后记录。'
   : 'AI估算（Mock 演示）：结果不根据照片判断食物。图片只在本机处理，不上传、不保存原图。';
 
 function wait(signal?: AbortSignal) {
@@ -55,12 +55,12 @@ export class RemoteFoodRecognitionProvider implements FoodRecognitionProvider {
   constructor(apiUrl: string) { this.apiUrl = apiUrl.trim().replace(/\/+$/, ''); }
   async recognizeFood(image: Blob, signal?: AbortSignal): Promise<FoodRecognitionResult> {
     signal?.throwIfAborted();
-    if (!this.apiUrl) throw new Error('请先配置本地识别服务地址');
+    if (!this.apiUrl) throw new Error('请先配置识别服务地址');
     const form = new FormData();
     form.append('image', image, 'food-photo');
     let response: Response;
     try { response = await fetch(`${this.apiUrl}/api/food-recognition`, { method: 'POST', body: form, signal }); }
-    catch { signal?.throwIfAborted(); throw new Error('无法连接本地识别服务，请确认服务已启动'); }
+    catch { signal?.throwIfAborted(); throw new Error('无法连接识别服务，请稍后重试'); }
     let value: unknown;
     try { value = await response.json(); } catch { signal?.throwIfAborted(); throw new Error(messages.AI_BAD_RESPONSE); }
     if (!response.ok) {

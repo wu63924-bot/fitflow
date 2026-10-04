@@ -114,10 +114,12 @@ The Vite PWA plugin generates a standalone manifest and service worker. The work
 4. 终端 A：`npm run dev:api`；终端 B：`npm run dev`。更改环境后重启。
 5. 打开 Vite 显示的本地 URL，饮食 → AI 拍照识别 → 选择真实餐食照片 → 识别 → 确认 AI估算的名称、重量与整份营养 → 保存。
 
-本地 API 使用 Node 原生 HTTP，仅监听 `127.0.0.1:8788`，路由 `POST /api/food-recognition`。图片只在内存用于本次调用，不保存原图；AI 路径直接返回名称、克数、整份热量/蛋白质/碳水/脂肪与置信度，不匹配本地 Food 库。确认后直接保存营养快照，并标记“AI估算”；手动添加仍使用本地 Food 库。重量和营养独立编辑，修改重量不自动修改整份营养。
+本地 API 使用 Node 原生 HTTP，默认监听 `0.0.0.0:8788`（HOST/PORT 可由服务器环境变量设置），路由 `POST /api/food-recognition`。图片只在内存用于本次调用，不保存原图；AI 路径直接返回名称、克数、整份热量/蛋白质/碳水/脂肪与置信度，不匹配本地 Food 库。确认后直接保存营养快照，并标记“AI估算”；手动添加仍使用本地 Food 库。重量和营养独立编辑，修改重量不自动修改整份营养。
 
-将 provider 改回 `mock` 并重启前端即可回退。**本阶段 `build` 和 `build:github` 均强制 Mock**，开发环境的 Remote 设置不会使静态站点请求 localhost。GitHub `/fitflow/` 和 Cloudflare `/` 构建方式保持原样。公网 Remote 留待 Phase 6B-2。
+将 provider 改回 `mock` 并重启前端即可回退。Provider 由 `VITE_FOOD_RECOGNITION_PROVIDER` 决定，不再根据开发或生产环境强制 Mock。`build:github` 使用 `.env.github` 中的 Remote 配置，调用 `https://fitflow-ai-tgazjqiieu.cn-beijing.fcapp.run`。前端配置仅包含公开地址，不包含 Qwen API Key。GitHub `/fitflow/` 和 Cloudflare `/` 构建方式保持原样。
 
 验证命令：`npm run typecheck`、`npm run typecheck:api`、`npm run test:recognition`、`npm run build`、`npm run build:github`。
 
 当前 AI 直接营养快照流程、73 项接口检查和浏览器回归结果见 [AI 食物识别简化验收](docs/ai-food-simplification-acceptance.md)。早期 [Phase 6B-1 报告](docs/phase6b1-acceptance.md) 中的 Food 匹配流程已被本次简化替代。本地 API 需要重启才会使用新 Prompt 和七字段响应校验。
+
+Phase 6B-2A 的生产编译、代码包结构、FC 环境变量和本地验收见 [Server 启动说明](docs/phase6b2a-server.md)。

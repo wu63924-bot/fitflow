@@ -6,3 +6,9 @@ dist/
 .env.*
 *.local
 !.env.example
+
+api-dist/
+
+# Public GitHub Pages build settings only.
+!.env.github
+fitflow-ai.zip

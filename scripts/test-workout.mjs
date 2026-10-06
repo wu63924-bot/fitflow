@@ -70,12 +70,24 @@ try {
     check(await reps.inputValue() === '10', 'reps decrease unchanged');
     const firstExercise = page.locator('.simple-exercise').nth(0);
     const secondExercise = page.locator('.simple-exercise').nth(1);
+    const collapseBox = await firstExercise.getByRole('button', { name: '收起动作' }).boundingBox();
+    const addBox = await firstExercise.getByRole('button', { name: '添加一组', exact: true }).boundingBox();
+    check(addBox.x >= collapseBox.x + collapseBox.width && Math.abs(addBox.y - collapseBox.y) < 2, 'add set is right of collapse control');
+    const doneBox = await firstExercise.getByRole('button', { name: '标记完成组' }).first().boundingBox();
+    const deleteBox = await firstExercise.getByRole('button', { name: '删除第 1 组', exact: true }).boundingBox();
+    check(deleteBox.x >= doneBox.x + doneBox.width && Math.abs(deleteBox.y - doneBox.y) < 2, 'delete is beside set completion');
+    check(deleteBox.width >= 44 && deleteBox.height >= 44, 'delete retains accessible touch target');
     await firstExercise.getByRole('button', { name: '收起动作' }).click();
     check(await firstExercise.locator('.exercise-details').getAttribute('inert') !== null, 'collapsed contents not interactive');
+    await firstExercise.getByRole('button', { name: '添加一组', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.simple-exercise .simple-sets tbody').children.length === 3);
+    check((await stored(page)).exercises[0].sets.length === 3, 'collapsed exercise supports adding set');
     await secondExercise.getByRole('button', { name: '展开动作' }).click();
     check(await firstExercise.getByRole('button', { name: '展开动作' }).count() === 1, 'expanding second keeps first collapsed');
     await firstExercise.getByRole('button', { name: '展开动作' }).click();
     check(await weight.inputValue() === '22.1', 'collapse preserves draft data');
+    await firstExercise.getByRole('button', { name: '删除第 3 组', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.simple-exercise .simple-sets tbody').children.length === 2);
     check(await secondExercise.getByRole('button', { name: '收起动作' }).count() === 1, 'expanding first keeps second expanded');
     await secondExercise.getByRole('button', { name: '收起动作' }).click();
     check(await firstExercise.getByRole('button', { name: '收起动作' }).count() === 1, 'collapsing second keeps first expanded');
@@ -91,12 +103,12 @@ try {
     await firstExercise.getByLabel('动作 A更多操作').click();
     await page.getByRole('button', { name: '保存组数据', exact: true }).click();
     check((await stored(page)).exercises[0].sets[0].weight === 22.1, 'more menu saves inputs');
-    await page.getByRole('button', { name: '＋ 添加一组', exact: true }).click();
+    await firstExercise.getByRole('button', { name: '添加一组', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('.simple-exercise .simple-sets tbody').children.length === 3);
-    check((await stored(page)).exercises[0].sets.length === 3, 'more menu adds set');
+    check((await stored(page)).exercises[0].sets.length === 3, 'header adds set');
     await page.getByRole('button', { name: '删除第 3 组', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('.simple-exercise .simple-sets tbody').children.length === 2);
-    check((await stored(page)).exercises[0].sets.length === 2, 'more menu deletes set');
+    check((await stored(page)).exercises[0].sets.length === 2, 'row action deletes set');
     await firstExercise.getByLabel('动作 A更多操作').click();
     await firstExercise.getByRole('button', { name: '完成下一组', exact: true }).click();
     await page.locator('.rest-tile').waitFor();
@@ -112,12 +124,17 @@ try {
     check((await stored(page)).restTimer.restEndsAt === restDeadline, 'rest controls preserve deadline');
     if (process.env.WORKOUT_SCREENSHOT && permission === 'denied') {
       if (await page.getByRole('button', { name: '关闭数字调整' }).count()) await page.getByRole('button', { name: '关闭数字调整' }).click();
+      await page.locator('.toast').waitFor({ state: 'hidden' });
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: process.env.WORKOUT_SCREENSHOT });
     }
     if (permission === 'default') {
       await page.getByRole('button', { name: '开启通知', exact: true }).click();
       check(await page.evaluate(() => window.permissionRequests) === 1, 'permission only from explicit click');
     }
+    page.once('dialog', dialog => dialog.dismiss());
+    await firstExercise.getByRole('button', { name: '删除第 1 组', exact: true }).click();
+    check((await stored(page)).exercises[0].sets[0].completed && (await stored(page)).exercises[0].sets.length === 2, 'completed-set deletion still requires confirmation');
     const before = await stored(page);
     await page.getByRole('button', { name: '返回主页' }).click();
     await page.locator('.mini-workout').waitFor();

@@ -39,6 +39,8 @@ export function SessionPage() {
   const [now, setNow] = useState(Date.now());
   const [draftInputs, setDraftInputs] = useState<Record<string, SetInput>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [restDetailsOpen, setRestDetailsOpen] = useState(false);
+  const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const [exerciseId, setExerciseId] = useState('');
   const { data, loading, refresh, setData } = useAsyncData<SessionLoaded>(async () => {
     const [session, sessions, settings, exercises] = await Promise.all([getWorkoutSession(sessionId), listWorkoutSessions(), getSettings(), listExercises()]);
@@ -196,30 +198,25 @@ export function SessionPage() {
   }
 
   const exerciseViews = activeSession.exercises;
-  const currentExercise = exerciseViews[currentIndex];
 
-  return <div className="page session-page">
-    <div className="session-top row-between"><div><span className="eyebrow">训练中</span><h1 className="session-title">{activeSession.workoutDayName}</h1></div><button className="ghost-button" onClick={() => void onMinimize()}>返回主页</button><button className="end-button" onClick={() => void onFinish()}>结束训练</button></div>
-    <section className="timer-card card"><div><span className="timer-caption">训练总时长</span><strong className="elapsed">{formatDuration((now - activeSession.startedAt) / 1000)}</strong></div><div className="timer-stat"><span className="timer-caption">完成组数</span><strong className="timer-stat-value">{countCompletedSets(activeSession)} / {countSets(activeSession.exercises)}</strong></div></section>
-
+  return <div className="page session-page simple-session">
+    <header className="session-toolbar"><button className="ghost-button" onClick={() => void onMinimize()}>‹ 返回主页</button><strong>FitFlow</strong><button className="end-button" onClick={() => void onFinish()}>结束训练</button></header>
+    <h1 className="session-title">{activeSession.workoutDayName}</h1>
+    <p className="session-summary"><span className="elapsed">{formatDuration((now - activeSession.startedAt) / 1000)}</span> · 已完成 {countCompletedSets(activeSession)}/{countSets(activeSession.exercises)} 组</p>
     {timer && <RestNotificationOffer />}
-
-    {exerciseViews.length > 0 && <div className="exercise-navigation card"><button className="nav-button" disabled={currentIndex === 0} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.max(0, current.currentExerciseIndex - 1); })}>‹ 上一动作</button><span className="nav-count">{currentIndex + 1} / {exerciseViews.length}</span><button className="nav-button" disabled={currentIndex >= exerciseViews.length - 1} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.min(current.exercises.length - 1, current.currentExerciseIndex + 1); })}>下一动作 ›</button></div>}
     {!exerciseViews.length && <EmptyState title="本次训练还没有动作">从动作库临时添加一个动作。</EmptyState>}
-
-    {currentExercise && <ExercisePanel collapsed={Boolean(collapsed[currentExercise.id])} onToggle={() => setCollapsed(current => ({ ...current, [currentExercise.id]: !current[currentExercise.id] }))} exercise={currentExercise} exerciseIndex={currentIndex} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />}
-
-    {exerciseViews.length > 1 && <div className="exercise-quick-nav">{exerciseViews.map((exercise, index) => <button key={exercise.id} className={`quick-exercise-chip${index === currentIndex ? ' selected' : ''}${exercise.skipped ? ' skipped' : ''}`} onClick={() => void mutate(current => { current.currentExerciseIndex = index; })}>{index + 1}. {exercise.name}</button>)}</div>}
-
-    <div className="add-exercise-row session-add-exercise"><select className="text-input" aria-label="选择临时动作" value={exerciseId} onChange={event => setExerciseId(event.target.value)}><option value="">临时添加动作</option>{activeData.exercises.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary-button" onClick={() => void addTemporaryExercise()}>添加</button></div>
-
-    {timer && <section className={`rest-panel card${timer.expanded ? '' : ' rest-collapsed'}`}>
-      {timer.expanded ? <>
-        <div className="row-between rest-header"><div className="rest-heading"><strong className="rest-label">{remaining ? '组间休息' : '休息结束'}</strong><span className="rest-subtitle">准备第 {timerTarget ? timerTarget.setIndex + 1 : 1} 组 · {timerTarget?.exercise.name ?? ''}</span></div><strong className="rest-clock">{formatClock(remaining)}</strong><button className="collapse rest-collapse-button" onClick={() => void mutate(current => { if (current.restTimer) current.restTimer.expanded = false; })}>收起</button></div>
-        <div className="button-row"><button className="ghost-button" onClick={() => void onAdjustRest(-30)}>−30秒</button><button className="secondary-button" onClick={() => void onAdjustRest(30)}>＋30秒</button><button className="primary-button" onClick={() => void onSkipRest()}>跳过休息</button></div>
-      </> : <><button className="rest-expand" onClick={() => void mutate(current => { if (current.restTimer) current.restTimer.expanded = true; })}>⏱ {remaining ? '休息' : '休息结束'} {formatClock(remaining)}</button><button className="collapsed-add" onClick={() => void onAdjustRest(30)}>＋30s</button></>}
-    </section>}
-    <button className="primary-button finish-button" onClick={() => void onFinish()}>结束训练</button>
+    {exerciseViews.map((exercise, index) => <ExercisePanel key={exercise.id} collapsed={collapsed[exercise.id] ?? index !== currentIndex} onToggle={() => setCollapsed(current => ({ ...current, [exercise.id]: !(current[exercise.id] ?? index !== currentIndex) }))} exercise={exercise} exerciseIndex={index} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />)}
+    <button className="add-set simple-add-exercise" aria-expanded={addExerciseOpen} onClick={() => setAddExerciseOpen(value => !value)}>＋ 添加动作</button>
+    {addExerciseOpen && <div className="add-exercise-row session-add-exercise"><select className="text-input" aria-label="选择临时动作" value={exerciseId} onChange={event => setExerciseId(event.target.value)}><option value="">临时添加动作</option>{activeData.exercises.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary-button" onClick={() => void addTemporaryExercise()}>添加</button></div>}
+    {timer && <aside className="rest-widget" aria-label="休息计时器">
+      {restDetailsOpen && <section className="rest-controls card" aria-label="休息操作">
+        <div className="row-between"><strong>休息设置</strong><button className="ghost-button" aria-label="收起休息设置" onClick={() => setRestDetailsOpen(false)}>收起</button></div>
+        <p className="muted small">第 {timerTarget ? timerTarget.setIndex + 1 : 1} 组 · {timerTarget?.exercise.name ?? ''}</p>
+        <div className="button-row"><button className="ghost-button" onClick={() => void onAdjustRest(-30)}>−30秒</button><button className="secondary-button" onClick={() => void onAdjustRest(30)}>＋30秒</button><button className="primary-button" onClick={() => { setRestDetailsOpen(false); void onSkipRest(); }}>跳过休息</button></div>
+      </section>}
+      <button className="rest-tile" aria-label="休息设置" aria-expanded={restDetailsOpen} onClick={() => setRestDetailsOpen(value => !value)}><span className="rest-tile-expand" aria-hidden="true">{restDetailsOpen ? '×' : '↗'}</span><span className="rest-label">{remaining ? '休息' : '休息结束'}</span><strong className="rest-clock">{formatClock(remaining)}</strong></button>
+    </aside>}
+    {exerciseViews.length > 0 && <nav className="session-footer" aria-label="动作导航"><button className="secondary-button" disabled={currentIndex === 0} onClick={() => { const index = currentIndex - 1; setCollapsed(current => ({ ...current, [exerciseViews[currentIndex].id]: true, [exerciseViews[index].id]: false })); void mutate(current => { current.currentExerciseIndex = index; }); }}>‹ 上一动作</button><button className="primary-button" disabled={currentIndex >= exerciseViews.length - 1} onClick={() => { const index = currentIndex + 1; setCollapsed(current => ({ ...current, [exerciseViews[currentIndex].id]: true, [exerciseViews[index].id]: false })); void mutate(current => { current.currentExerciseIndex = index; }); }}>下一动作 ›</button></nav>}
   </div>;
 }
 
@@ -237,28 +234,25 @@ function ExercisePanel({ collapsed, onToggle, exercise, exerciseIndex, sessions,
 }) {
   const previous = getPreviousPerformance(exercise.exerciseId, sessions.filter(item => !item.exercises.some(current => current.id === exercise.id)));
   const previousSets = previous?.sets.filter(set => set.completed) ?? [];
-  return <article className={`exercise-session card${exercise.skipped ? ' exercise-skipped' : ''}`}>
-    <div className="row-between exercise-session-head"><div><h2 className="exercise-name">{exercise.name}</h2><span className="exercise-meta">{exercise.muscle} · {exercise.sets.length} 组 · 休息 {exercise.restSeconds}s</span></div><span className="exercise-count">{exercise.sets.filter(set => set.completed).length}/{exercise.sets.length}</span></div>
-    <div className={`exercise-details${collapsed ? " is-collapsed" : ""}`} inert={collapsed}><div>
-    <div className="last-performance"><span className="last-label">上次成绩</span>{previousSets.length ? previousSets.map((set, index) => <span className="last-set" key={`${exercise.id}-last-${index}`}>{set.weight}kg × {set.reps}</span>) : <span className="last-set">暂无记录</span>}</div>
-    {exercise.skipped ? <button className="secondary-button full-button" onClick={() => onSkipExercise(exerciseIndex)}>恢复动作</button> : <>
-      <div className="sets-table-header"><span>组</span><span>上次成绩</span><span>本组</span></div>
-      {exercise.sets.map((set, setIndex) => <div className={`set-row${set.completed ? ' is-complete' : ''}`} key={set.id}>
-        <span className="set-number">{setIndex + 1}</span><span className="set-previous">{previousSets[setIndex] ? `${previousSets[setIndex].weight}×${previousSets[setIndex].reps}` : '—'}</span>
-        <div className="set-actions"><button className={`set-done${set.completed ? ' done' : ''}`} aria-label={set.completed ? '撤销完成组' : '标记完成组'} onClick={() => onCompleteSet(exerciseIndex, setIndex)}>{set.completed ? '✓' : '完成'}</button><button className="set-delete" aria-label="删除组" onClick={() => onDeleteSet(exerciseIndex, setIndex)}>×</button></div>
-        <div className="set-fields">
-          <div className="set-stepper-control"><button className="step-button" aria-label="减少 2 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', -2)}>−</button><label><span className="sr-only">重量（公斤）</span><input className="set-input" type="text" inputMode="decimal" onPointerDown={event => { if (document.activeElement !== event.currentTarget) event.currentTarget.dataset.selectOnClick = "true"; }} onFocus={event => event.currentTarget.select()} onClick={event => { if (event.currentTarget.dataset.selectOnClick) { const input = event.currentTarget; const value = input.value; requestAnimationFrame(() => { if (document.activeElement === input && input.value === value) input.setSelectionRange(0, value.length); delete input.dataset.selectOnClick; }); } }} onBlur={event => { if (!event.currentTarget.value.trim()) onInputChange(exerciseIndex, setIndex, "weight", "0"); }} value={draftInputs[set.id]?.weight ?? set.weight} onChange={event => onInputChange(exerciseIndex, setIndex, 'weight', event.target.value)} /></label><button className="step-button" aria-label="增加 2 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', 2)}>＋</button><span className="set-unit">kg</span></div>
-          <span className="set-times">×</span>
-          <div className="set-stepper-control reps-stepper-control"><button className="step-button" aria-label="减少 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', -1)}>−</button><label><span className="sr-only">次数</span><input className="set-input reps-input" type="number" inputMode="numeric" min="1" step="1" value={draftInputs[set.id]?.reps ?? set.reps} onChange={event => onInputChange(exerciseIndex, setIndex, 'reps', event.target.value)} /></label><button className="step-button" aria-label="增加 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', 1)}>＋</button><span className="set-unit">次</span></div>
-        </div>
-      </div>)}
-      <button className="secondary-button full-button" onClick={onSaveSets}>保存组数据</button>
-      <p className="muted small">完成一组时也会保存本组数据。</p>
-      <button className="add-set" onClick={() => onAddSet(exerciseIndex)}>＋ 添加一组</button>
-      <button className="skip-exercise" onClick={() => onSkipExercise(exerciseIndex)}>跳过动作</button>
-    </>}
+  const [editing, setEditing] = useState<{ setId: string; field: 'weight' | 'reps' }>();
+  const nextSetIndex = exercise.sets.findIndex(set => !set.completed);
+  const editingIndex = exercise.sets.findIndex(set => set.id === editing?.setId);
+  return <article className={`exercise-session card simple-exercise${exercise.skipped ? ' exercise-skipped' : ''}`}>
+    <div className="row-between exercise-session-head"><h2 className="exercise-name">{exercise.name}</h2><span className="exercise-count">{exercise.sets.filter(set => set.completed).length}/{exercise.sets.length} 组</span><button className="exercise-toggle" aria-label={collapsed ? '展开动作' : '收起动作'} aria-expanded={!collapsed} onClick={onToggle}>{collapsed ? '⌄' : '⌃'}</button><details className="exercise-more"><summary aria-label={`${exercise.name}更多操作`}>⋯</summary><div className="exercise-menu">
+      <div className="last-performance"><span className="last-label">上次成绩</span>{previousSets.length ? previousSets.map((set, index) => <span className="last-set" key={index}>{set.weight}kg × {set.reps}</span>) : <span className="last-set">暂无记录</span>}</div>
+      <button className="ghost-button" onClick={onSaveSets}>保存组数据</button><button className="ghost-button" onClick={() => onAddSet(exerciseIndex)}>＋ 添加一组</button><button className="ghost-button" onClick={() => onSkipExercise(exerciseIndex)}>{exercise.skipped ? '恢复动作' : '跳过动作'}</button>
+      {exercise.sets.map((set, index) => <button className="ghost-button" key={set.id} onClick={() => onDeleteSet(exerciseIndex, index)}>删除第 {index + 1} 组</button>)}
+    </div></details></div>
+    <div className={`exercise-details${collapsed ? ' is-collapsed' : ''}`} inert={collapsed}><div>
+      {!exercise.skipped && <>
+        <table className="simple-sets"><thead><tr><th>组</th><th>重量 kg</th><th>次数</th><th>完成</th></tr></thead><tbody>
+          {exercise.sets.map((set, setIndex) => <tr className={set.completed ? 'is-complete' : ''} key={set.id}><td>{setIndex + 1}</td><td><label><span className="sr-only">重量（公斤）</span><input className="set-input" type="text" inputMode="decimal" onPointerDown={event => { if (document.activeElement !== event.currentTarget) event.currentTarget.dataset.selectOnClick = "true"; }} onFocus={event => { setEditing({ setId: set.id, field: 'weight' }); event.currentTarget.select(); }} onClick={event => { if (event.currentTarget.dataset.selectOnClick) { const input = event.currentTarget; const value = input.value; requestAnimationFrame(() => { if (document.activeElement === input && input.value === value) input.setSelectionRange(0, value.length); delete input.dataset.selectOnClick; }); } }} onBlur={event => { if (!event.currentTarget.value.trim()) onInputChange(exerciseIndex, setIndex, "weight", "0"); }} value={draftInputs[set.id]?.weight ?? set.weight} onChange={event => onInputChange(exerciseIndex, setIndex, 'weight', event.target.value)} /></label></td><td><label><span className="sr-only">次数</span><input className="set-input reps-input" type="number" inputMode="numeric" onFocus={() => setEditing({ setId: set.id, field: 'reps' })} min="1" step="1" value={draftInputs[set.id]?.reps ?? set.reps} onChange={event => onInputChange(exerciseIndex, setIndex, 'reps', event.target.value)} /></label></td><td><button className={`set-done${set.completed ? ' done' : ''}`} aria-label={set.completed ? '撤销完成组' : '标记完成组'} onClick={() => onCompleteSet(exerciseIndex, setIndex)}>{set.completed ? '✓' : '○'}</button></td></tr>)}
+        </tbody></table>
+        {editing && editingIndex >= 0 && <div className="set-edit-toolbar" aria-label="数字调整"><span>第 {editingIndex + 1} 组 · {editing.field === 'weight' ? '重量 kg' : '次数'}</span><button className="secondary-button" aria-label={editing.field === 'weight' ? '减少 2 公斤' : '减少 1 次'} onPointerDown={event => event.preventDefault()} onClick={() => onAdjustSet(exerciseIndex, editingIndex, editing.field, editing.field === 'weight' ? -2 : -1)}>−</button><button className="secondary-button" aria-label={editing.field === 'weight' ? '增加 2 公斤' : '增加 1 次'} onPointerDown={event => event.preventDefault()} onClick={() => onAdjustSet(exerciseIndex, editingIndex, editing.field, editing.field === 'weight' ? 2 : 1)}>＋</button><button className="ghost-button" aria-label="关闭数字调整" onClick={() => setEditing(undefined)}>完成</button></div>}
+        <button className="primary-button full-button complete-next" disabled={nextSetIndex < 0} onClick={() => { setEditing(undefined); onCompleteSet(exerciseIndex, nextSetIndex); }}>{nextSetIndex < 0 ? '本动作已完成' : '完成下一组'}</button>
+      </>}
+      {exercise.skipped && <button className="secondary-button full-button" onClick={() => onSkipExercise(exerciseIndex)}>恢复动作</button>}
     </div></div>
-    <button className="collapse exercise-toggle" aria-expanded={!collapsed} onClick={onToggle}>{collapsed ? "展开动作" : "收起动作"}</button>
   </article>;
 }
 

@@ -633,3 +633,50 @@ img { display: block; max-width: 100%; }
 .rest-panel .button-row button { min-height: 44px; }
 .rest-collapsed { min-height: 48px; padding: 0 12px; }
 .rest-expand, .collapsed-add { min-height: 44px; }
+
+/* Approved simplified workout layout. Keep existing data and timer behavior. */
+.session-main .simple-session { padding-bottom: calc(220px + env(safe-area-inset-bottom)); }
+.session-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 20px; }
+.session-toolbar .ghost-button { padding: 0; }
+.session-toolbar > strong { color: var(--green); font-size: 18px; }
+.session-toolbar .end-button { border: 0; background: transparent; padding: 0; min-height: 44px; }
+.simple-session > .session-title { font-size: 26px; margin: 0; }
+.session-summary { margin: 10px 0 20px; color: var(--muted); font-size: 14px; }
+.session-summary .elapsed { display: inline; margin: 0; color: inherit; font-size: inherit; font-weight: 400; }
+.simple-exercise { position: relative; padding: 14px; margin-top: 12px; }
+.simple-exercise .exercise-session-head { align-items: center; gap: 6px; }
+.simple-exercise .exercise-name { flex: 1; min-width: 0; margin: 0; font-size: 17px; }
+.simple-exercise .exercise-count { color: var(--muted); font-weight: 400; white-space: nowrap; }
+.simple-exercise .exercise-toggle { width: 36px; min-height: 44px; flex-shrink: 0; margin: 0; border: 0; background: transparent; color: #607066; font-size: 22px; }
+.exercise-more { flex: 0 0 32px; }
+.exercise-more > summary { display: grid; place-items: center; min-height: 44px; list-style: none; color: #607066; font-size: 24px; cursor: pointer; }
+.exercise-more > summary::-webkit-details-marker { display: none; }
+.exercise-menu { position: absolute; right: 12px; top: 60px; z-index: 20; width: min(260px, calc(100% - 24px)); max-height: 55dvh; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: var(--shadow); }
+.exercise-menu > button { display: block; width: 100%; min-height: 44px; text-align: left; }
+.exercise-menu .last-performance { margin: 0 0 8px; }
+.simple-sets { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 8px 0 14px; text-align: center; }
+.simple-sets th { height: 34px; background: #f6f8f7; color: var(--muted); font-size: 12px; font-weight: 400; }
+.simple-sets th:first-child { width: 28px; border-radius: 8px 0 0 8px; }
+.simple-sets th:last-child { width: 50px; border-radius: 0 8px 8px 0; }
+.simple-sets td { padding: 5px 4px; height: 54px; font-size: 14px; }
+.simple-sets .set-input { height: 44px; font-size: 16px; background: #f9fbfa; }
+.simple-sets .set-done { display: inline-grid; place-items: center; width: 44px; min-height: 44px; background: transparent; color: #859189; font-size: 30px; font-weight: 400; }
+.simple-sets .set-done.done { color: var(--green); font-size: 22px; }
+.simple-sets .is-complete { background: transparent; }
+.set-edit-toolbar { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 8px; border-radius: 10px; background: var(--green-pale); }
+.set-edit-toolbar > span { flex: 1; font-size: 11px; color: var(--muted); }
+.set-edit-toolbar > button { min-width: 44px; min-height: 44px; padding: 0 8px; }
+.complete-next { min-height: 46px; }
+.simple-add-exercise { min-height: 48px; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; background: transparent; font-size: 14px; }
+.session-footer { position: fixed; z-index: 26; left: 50%; transform: translateX(-50%); bottom: 0; width: min(100%, 560px); display: flex; gap: 10px; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); background: var(--page-bg); border-top: 1px solid var(--line); }
+.session-footer > button { flex: 1; min-height: 44px; }
+.rest-widget { position: fixed; z-index: 25; right: max(18px, calc((100vw - 524px)/2)); bottom: calc(80px + env(safe-area-inset-bottom)); }
+.rest-tile { position: relative; width: 104px; height: 104px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; border: 1px solid #b7d7c5; border-radius: 18px; padding: 14px 8px 8px; background: white; box-shadow: 0 5px 18px rgba(28,68,48,.1); }
+.rest-tile .rest-label { color: var(--muted); font-size: 12px; font-weight: 400; }
+.rest-tile .rest-clock { font-size: 30px; line-height: 1; letter-spacing: -.04em; }
+.rest-tile-expand { position: absolute; top: 6px; right: 9px; color: var(--muted); font-size: 16px; }
+.rest-controls { position: absolute; right: 0; bottom: 116px; width: min(310px, calc(100vw - 36px)); margin: 0; padding: 12px; box-shadow: var(--shadow); }
+.rest-controls .ghost-button { min-height: 44px; }
+.rest-controls .button-row { margin-top: 8px; }
+.rest-controls .button-row button { min-height: 44px; }
+@media (min-width: 561px) { .session-footer { bottom: 22px; } .rest-widget { bottom: calc(102px + env(safe-area-inset-bottom)); } }

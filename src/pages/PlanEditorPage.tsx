@@ -34,6 +34,8 @@ export function PlanEditorPage() {
   const [draft, setDraft] = useState<TrainingPlan>();
   const [extraExercises, setExtraExercises] = useState<Exercise[]>([]);
   const [selectedDayId, setSelectedDayId] = useState('');
+  const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [parameterInputs, setParameterInputs] = useState<Record<string, Partial<Record<ParameterField, string>>>>({});
   const { data, loading } = useAsyncData(async () => {
     const [plan, exercises] = await Promise.all([isNew ? Promise.resolve(newPlan()) : getTrainingPlan(planId), listExercises()]);
@@ -43,7 +45,9 @@ export function PlanEditorPage() {
     if (!data?.plan) return;
     setDraft(data.plan);
     const requestedDay = searchParams.get('day');
-    if (requestedDay) setSelectedDayId(requestedDay);
+    setSelectedDayId(data.plan.days.find(day => day.id === requestedDay)?.id ?? data.plan.days.slice().sort((a, b) => a.order - b.order)[0]?.id ?? '');
+    setPickerOpen(false);
+    setExpandedExercises({});
   }, [data, searchParams]);
 
   const selectedDay = draft?.days.find(day => day.id === selectedDayId);
@@ -73,6 +77,8 @@ export function PlanEditorPage() {
         function readNumber(value: string, label: string, min: number, max = Infinity, integer = true) {
           const number = Number(value);
           if (!value.trim() || !Number.isFinite(number) || number < min || number > max || (integer && !Number.isInteger(number))) {
+            setSelectedDayId(day.id);
+            setExpandedExercises(current => ({ ...current, [item.id]: true }));
             throw new Error(`${day.weekday}：请填写有效的${label}`);
           }
           return number;
@@ -100,44 +106,41 @@ export function PlanEditorPage() {
     updateDay(selectedDay.id, { exercises: [...selectedDay.exercises, { ...plannedExerciseFromDefinition(definition, selectedDay.exercises.length), sets: 1 }] });
   }
 
-  return <div className="page">
-    <BackHeader title={isNew ? '新建训练计划' : '编辑训练计划'} subtitle="所有更改会保存在本机" />
+  return <div className="page plan-editor-page">
+    <BackHeader title={isNew ? '新建训练计划' : '编辑训练计划'} />
     <label className="field-label">计划名称<input className="text-input" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} maxLength={40} /></label>
-    <section className="section">
-      <div className="section-head"><h2 className="section-title">训练周期</h2><span className="muted small">七天循环</span></div>
-      <div className="day-editor-list">
-        {draft.days.slice().sort((a, b) => a.order - b.order).map(day => <button key={day.id} className={`day-editor-card card${selectedDayId === day.id ? ' day-editor-selected' : ''}`} onClick={() => setSelectedDayId(day.id)}>
-          <span className="day-editor-weekday">{day.weekday}</span>
-          <span className="day-editor-copy"><strong>{day.name}</strong><small>{day.isRestDay ? '休息日' : `${day.exercises.length} 个动作 · ${day.targetMuscles}`}</small></span>
-          <span className="exercise-chevron">›</span>
-        </button>)}
-      </div>
-    </section>
-
-    {selectedDay && <section className="section day-detail-editor card">
-      <div className="row-between"><h2 className="section-title">编辑 {selectedDay.weekday}</h2><button className="text-button" onClick={() => setSelectedDayId('')}>收起</button></div>
-      <label className="field-label">训练日名称<input className="text-input" value={selectedDay.name} onChange={event => updateDay(selectedDay.id, { name: event.target.value })} maxLength={32} /></label>
-      <label className="field-label">目标肌群<input className="text-input" value={selectedDay.targetMuscles} onChange={event => updateDay(selectedDay.id, { targetMuscles: event.target.value })} maxLength={48} /></label>
-      <label className="toggle-row"><input type="checkbox" checked={selectedDay.isRestDay} onChange={event => updateDay(selectedDay.id, { isRestDay: event.target.checked, name: event.target.checked ? '休息' : '训练日' })} /><span>设为休息日</span></label>
-
-      {!selectedDay.isRestDay && <>
-        <div className="section-head compact-head"><h3 className="section-title">动作安排</h3><span className="muted small">可调整顺序与参数</span></div>
-        {!selectedDay.exercises.length && <p className="muted small">还没有动作，从动作库添加一个。</p>}
+    <div className="plan-week-selector" aria-label="选择训练日">
+      {draft.days.slice().sort((a, b) => a.order - b.order).map(day => <button key={day.id} className={selectedDayId === day.id ? 'selected' : ''} aria-label={day.weekday} aria-pressed={selectedDayId === day.id} onClick={() => { setSelectedDayId(day.id); setPickerOpen(false); }}>{day.weekday.replace('周', '')}</button>)}
+    </div>
+    <p className="plan-cycle-summary">七天循环 · 已安排 {draft.days.filter(day => !day.isRestDay).length} 个训练日</p>
+    {selectedDay && <>
+      <section className="plan-day-card card">
+        <div className="row-between"><h2 className="section-title">{selectedDay.weekday}</h2><div className="plan-day-mode" aria-label="训练日类型"><button aria-pressed={!selectedDay.isRestDay} className={!selectedDay.isRestDay ? 'selected' : ''} onClick={() => { if (selectedDay.isRestDay) updateDay(selectedDay.id, { isRestDay: false, name: '训练日' }); }}>训练</button><button aria-pressed={selectedDay.isRestDay} className={selectedDay.isRestDay ? 'selected' : ''} onClick={() => { if (!selectedDay.isRestDay) updateDay(selectedDay.id, { isRestDay: true, name: '休息' }); }}>休息</button></div></div>
+        <label className="field-label plan-day-name">{selectedDay.isRestDay ? '休息日名称' : '训练名称'}<input className="text-input" value={selectedDay.name} onChange={event => updateDay(selectedDay.id, { name: event.target.value })} maxLength={32} /></label>
+        {selectedDay.isRestDay ? <p className="muted small">休息日 · 恢复与拉伸</p> : <>
+          <div className="section-head compact-head"><h3 className="section-title">动作安排</h3><span className="muted small">{selectedDay.exercises.length} 个动作</span></div>
+          {!selectedDay.exercises.length && <p className="muted small">还没有动作，点击下方添加。</p>}
         {selectedDay.exercises.slice().sort((a, b) => a.order - b.order).map((item, index) => {
           const exercise = exerciseOptions.find(definition => definition.id === item.exerciseId);
-          return <div className="planned-editor card" key={item.id}>
-            <div className="planned-editor-title"><strong>{exercise?.name ?? '未知动作'}</strong><div className="inline-actions"><button className="icon-button" aria-label="上移" disabled={index === 0} onClick={() => reorderExercise(selectedDay, index, -1)}>↑</button><button className="icon-button" aria-label="下移" disabled={index === selectedDay.exercises.length - 1} onClick={() => reorderExercise(selectedDay, index, 1)}>↓</button><button className="icon-button danger-icon" aria-label="删除" onClick={() => updateDay(selectedDay.id, { exercises: selectedDay.exercises.filter(exerciseItem => exerciseItem.id !== item.id).map((exerciseItem, order) => ({ ...exerciseItem, order })) })}>×</button></div></div>
+          return <div className="planned-editor plan-exercise-row" key={item.id}>
+            <button className="plan-exercise-summary" aria-expanded={Boolean(expandedExercises[item.id])} onClick={() => setExpandedExercises(current => ({ ...current, [item.id]: !current[item.id] }))}><span><strong>{exercise?.name ?? '未知动作'}</strong><small>{parameterInputs[item.id]?.sets ?? item.sets} 组 × {parameterInputs[item.id]?.reps ?? item.repsMin} 次 · {parameterInputs[item.id]?.referenceWeight ?? item.referenceWeight ?? 0} kg · 休息 {parameterInputs[item.id]?.restSeconds ?? item.restSeconds} 秒</small></span><span aria-hidden="true">{expandedExercises[item.id] ? '⌃' : '›'}</span></button>
+            {expandedExercises[item.id] && <>
             <div className="planned-fields">
               <label>组数<input type="number" min="1" max="20" step="1" inputMode="numeric" value={parameterInputs[item.id]?.sets ?? String(item.sets)} onChange={event => setParameterInput(item.id, 'sets', event.target.value)} /></label>
               <label>次数<input type="number" min="1" step="1" inputMode="numeric" value={parameterInputs[item.id]?.reps ?? String(item.repsMin)} onChange={event => setParameterInput(item.id, 'reps', event.target.value)} /></label>
               <label>参考重量 kg<input type="number" min="0" step="0.5" inputMode="decimal" value={parameterInputs[item.id]?.referenceWeight ?? String(item.referenceWeight ?? 0)} onChange={event => setParameterInput(item.id, 'referenceWeight', event.target.value)} /></label>
               <label>休息秒数<input type="number" min="0" max="600" step="1" inputMode="numeric" value={parameterInputs[item.id]?.restSeconds ?? String(item.restSeconds)} onChange={event => setParameterInput(item.id, 'restSeconds', event.target.value)} /></label>
             </div>
+            <div className="plan-exercise-actions"><button className="ghost-button" aria-label="上移" disabled={index === 0} onClick={() => reorderExercise(selectedDay, index, -1)}>↑ 上移</button><button className="ghost-button" aria-label="下移" disabled={index === selectedDay.exercises.length - 1} onClick={() => reorderExercise(selectedDay, index, 1)}>↓ 下移</button><button className="ghost-button danger-icon" aria-label="删除动作" onClick={() => updateDay(selectedDay.id, { exercises: selectedDay.exercises.filter(exerciseItem => exerciseItem.id !== item.id).map((exerciseItem, order) => ({ ...exerciseItem, order })) })}>删除</button></div>
+            </>}
           </div>;
         })}
-        <ExercisePicker exercises={exerciseOptions} onAdd={addExercise} />
-      </>}
-    </section>}
-    <button className="primary-button sticky-action" onClick={() => void onSave()}>保存训练计划</button>
+        <button className="secondary-button full-button plan-add-exercise" aria-expanded={pickerOpen} onClick={() => setPickerOpen(value => !value)}>{pickerOpen ? '收起动作库' : '＋ 添加动作'}</button>
+        {pickerOpen && <div className="plan-exercise-picker"><ExercisePicker exercises={exerciseOptions} onAdd={addExercise} /></div>}
+        </>}
+      </section>
+      <details className="plan-more-settings card" key={selectedDay.id}><summary>更多设置<span aria-hidden="true">⌄</span></summary><label className="field-label">目标肌群<input className="text-input" value={selectedDay.targetMuscles} onChange={event => updateDay(selectedDay.id, { targetMuscles: event.target.value })} maxLength={48} /></label></details>
+    </>}
+    <div className="plan-save-bar"><button className="primary-button full-button" onClick={() => void onSave()}>保存训练计划</button></div>
   </div>;
 }

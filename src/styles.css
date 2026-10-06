@@ -605,3 +605,21 @@ img { display: block; max-width: 100%; }
 .nutrition-page .recognition-summary p { margin: 6px 0; }
 .nutrition-page .recognition-food { margin-top: 8px; }
 .nutrition-page .recognition-controls > .field-label { margin: 14px 0 8px; }
+
+/* Keep numeric training inputs readable without disabling accessible zoom. */
+.session-page .set-input, .session-page input[type=number], .planned-fields input[type=number], .scheduled-set-editor input[type=number] { font-size: 16px; }
+.session-top { flex-wrap: wrap; gap: 8px; }
+.session-top > div { flex: 1 1 160px; min-width: 0; }
+.exercise-details { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .2s ease; }
+.exercise-details > div { min-height: 0; overflow: hidden; }
+.exercise-details.is-collapsed { grid-template-rows: 0fr; }
+.exercise-toggle { width: 100%; min-height: 44px; margin-top: 8px; }
+.app-main:has(~ .mini-workout) { padding-bottom: 112px; }
+.app-main:has(~ .mini-workout) .sticky-action { bottom: calc(190px + env(safe-area-inset-bottom)); }
+.mini-workout { position: fixed; z-index: 35; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 528px); display: flex; align-items: center; gap: 12px; padding: 12px; margin: 0; }
+.mini-workout > div { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.mini-workout strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-workout .primary-button { flex-shrink: 0; text-decoration: none; }
+.rest-notification-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; }
+@media (min-width: 561px) { .mini-workout { bottom: calc(98px + env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion: reduce) { .exercise-details { transition: none; } }

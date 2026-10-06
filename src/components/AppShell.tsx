@@ -1,3 +1,4 @@
+import { ActiveWorkout } from './ActiveWorkout';
 import { NavLink, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 
@@ -15,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <main className={hideTabs ? 'app-main session-main' : 'app-main'}>{children}</main>
+      <ActiveWorkout inSession={hideTabs} />
       {!hideTabs && <nav className="tab-bar" aria-label="主导航">
         {tabs.map(tab => <NavLink key={tab.to} to={tab.to} className={({ isActive }) => `tab-item${isActive ? ' active' : ''}`}>
           <span className="tab-icon" aria-hidden="true">{tab.icon}</span><span>{tab.label}</span>

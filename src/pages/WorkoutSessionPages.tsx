@@ -1,3 +1,4 @@
+import { RestNotificationOffer } from '../components/ActiveWorkout';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { findNextSet, getPreviousPerformance, hasIncompleteSets, plannedExerciseFromDefinition, countCompletedSets, countSets, calculateVolume, createSet } from '../utils/workout';
@@ -37,6 +38,7 @@ export function SessionPage() {
   const toast = useToast();
   const [now, setNow] = useState(Date.now());
   const [draftInputs, setDraftInputs] = useState<Record<string, SetInput>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [exerciseId, setExerciseId] = useState('');
   const { data, loading, refresh, setData } = useAsyncData<SessionLoaded>(async () => {
     const [session, sessions, settings, exercises] = await Promise.all([getWorkoutSession(sessionId), listWorkoutSessions(), getSettings(), listExercises()]);
@@ -51,15 +53,6 @@ export function SessionPage() {
     window.addEventListener('pageshow', recalibrate);
     return () => { window.clearInterval(intervalId); document.removeEventListener('visibilitychange', recalibrate); window.removeEventListener('pageshow', recalibrate); };
   }, [refresh]);
-
-  useEffect(() => {
-    if (!session?.restTimer || remainingSeconds(session.restTimer, now) !== 0 || session.restTimer.expiredNotified) return;
-    void mutateWorkoutSession(session.id, stored => {
-      if (!stored.restTimer || stored.restTimer.restEndsAt > Date.now() || stored.restTimer.expiredNotified) return;
-      stored.restTimer.expiredNotified = true;
-    }).then(() => refresh());
-    if (data?.vibrationEnabled && typeof navigator.vibrate === 'function') navigator.vibrate(100);
-  }, [session?.id, session?.restTimer?.restEndsAt, session?.restTimer?.expiredNotified, now, data?.vibrationEnabled, refresh]);
 
   if (loading || !data) return <div className="page"><div className="loading-state"><span className="spinner" />正在恢复训练…</div></div>;
   if (!session || session.status !== 'in_progress') return <div className="page"><BackHeader title="训练已结束" /><EmptyState title="找不到进行中的训练">返回训练页开始新的训练。</EmptyState><button className="primary-button full-button" onClick={() => navigate('/workout')}>回到训练</button></div>;
@@ -100,6 +93,14 @@ export function SessionPage() {
       if (input) values.set(set.id, readSetValues(set, input, `${exercise.name}第 ${index + 1} 组`));
     });
     return values;
+  }
+
+  async function onMinimize() {
+    try {
+      const values = readDraftValues();
+      await mutate(current => applySetValues(current, values));
+      navigate('/home');
+    } catch (error) { toast(error instanceof Error ? error.message : '组数据保存失败'); }
   }
 
   async function onSaveSets() {
@@ -198,13 +199,15 @@ export function SessionPage() {
   const currentExercise = exerciseViews[currentIndex];
 
   return <div className="page session-page">
-    <div className="session-top row-between"><div><span className="eyebrow">训练中</span><h1 className="session-title">{activeSession.workoutDayName}</h1></div><button className="end-button" onClick={() => void onFinish()}>结束训练</button></div>
+    <div className="session-top row-between"><div><span className="eyebrow">训练中</span><h1 className="session-title">{activeSession.workoutDayName}</h1></div><button className="ghost-button" onClick={() => void onMinimize()}>返回主页</button><button className="end-button" onClick={() => void onFinish()}>结束训练</button></div>
     <section className="timer-card card"><div><span className="timer-caption">训练总时长</span><strong className="elapsed">{formatDuration((now - activeSession.startedAt) / 1000)}</strong></div><div className="timer-stat"><span className="timer-caption">完成组数</span><strong className="timer-stat-value">{countCompletedSets(activeSession)} / {countSets(activeSession.exercises)}</strong></div></section>
+
+    {timer && <RestNotificationOffer />}
 
     {exerciseViews.length > 0 && <div className="exercise-navigation card"><button className="nav-button" disabled={currentIndex === 0} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.max(0, current.currentExerciseIndex - 1); })}>‹ 上一动作</button><span className="nav-count">{currentIndex + 1} / {exerciseViews.length}</span><button className="nav-button" disabled={currentIndex >= exerciseViews.length - 1} onClick={() => void mutate(current => { current.currentExerciseIndex = Math.min(current.exercises.length - 1, current.currentExerciseIndex + 1); })}>下一动作 ›</button></div>}
     {!exerciseViews.length && <EmptyState title="本次训练还没有动作">从动作库临时添加一个动作。</EmptyState>}
 
-    {currentExercise && <ExercisePanel exercise={currentExercise} exerciseIndex={currentIndex} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />}
+    {currentExercise && <ExercisePanel collapsed={Boolean(collapsed[currentExercise.id])} onToggle={() => setCollapsed(current => ({ ...current, [currentExercise.id]: !current[currentExercise.id] }))} exercise={currentExercise} exerciseIndex={currentIndex} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />}
 
     {exerciseViews.length > 1 && <div className="exercise-quick-nav">{exerciseViews.map((exercise, index) => <button key={exercise.id} className={`quick-exercise-chip${index === currentIndex ? ' selected' : ''}${exercise.skipped ? ' skipped' : ''}`} onClick={() => void mutate(current => { current.currentExerciseIndex = index; })}>{index + 1}. {exercise.name}</button>)}</div>}
 
@@ -221,7 +224,8 @@ export function SessionPage() {
   </div>;
 }
 
-function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInputChange, onAdjustSet, onSaveSets, onCompleteSet, onAddSet, onDeleteSet, onSkipExercise }: {
+function ExercisePanel({ collapsed, onToggle, exercise, exerciseIndex, sessions, draftInputs, onInputChange, onAdjustSet, onSaveSets, onCompleteSet, onAddSet, onDeleteSet, onSkipExercise }: {
+  collapsed: boolean; onToggle: () => void;
   exercise: WorkoutSessionExercise; exerciseIndex: number; sessions: WorkoutSession[];
   draftInputs: Record<string, SetInput>;
   onInputChange: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
@@ -236,6 +240,7 @@ function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInput
   const previousSets = previous?.sets.filter(set => set.completed) ?? [];
   return <article className={`exercise-session card${exercise.skipped ? ' exercise-skipped' : ''}`}>
     <div className="row-between exercise-session-head"><div><h2 className="exercise-name">{exercise.name}</h2><span className="exercise-meta">{exercise.muscle} · {exercise.sets.length} 组 · 休息 {exercise.restSeconds}s</span></div><span className="exercise-count">{exercise.sets.filter(set => set.completed).length}/{exercise.sets.length}</span></div>
+    <div className={`exercise-details${collapsed ? " is-collapsed" : ""}`} inert={collapsed}><div>
     <div className="last-performance"><span className="last-label">上次成绩</span>{previousSets.length ? previousSets.map((set, index) => <span className="last-set" key={`${exercise.id}-last-${index}`}>{set.weight}kg × {set.reps}</span>) : <span className="last-set">暂无记录</span>}</div>
     {exercise.skipped ? <button className="secondary-button full-button" onClick={() => onSkipExercise(exerciseIndex)}>恢复动作</button> : <>
       <div className="sets-table-header"><span>组</span><span>上次成绩</span><span>本组</span></div>
@@ -243,7 +248,7 @@ function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInput
         <span className="set-number">{setIndex + 1}</span><span className="set-previous">{previousSets[setIndex] ? `${previousSets[setIndex].weight}×${previousSets[setIndex].reps}` : '—'}</span>
         <div className="set-actions"><button className={`set-done${set.completed ? ' done' : ''}`} aria-label={set.completed ? '撤销完成组' : '标记完成组'} onClick={() => onCompleteSet(exerciseIndex, setIndex)}>{set.completed ? '✓' : '完成'}</button><button className="set-delete" aria-label="删除组" onClick={() => onDeleteSet(exerciseIndex, setIndex)}>×</button></div>
         <div className="set-fields">
-          <div className="set-stepper-control"><button className="step-button" aria-label="减少 2.5 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', -2.5)}>−</button><label><span className="sr-only">重量（公斤）</span><input className="set-input" type="number" inputMode="decimal" min="0" step="0.5" value={draftInputs[set.id]?.weight ?? set.weight} onChange={event => onInputChange(exerciseIndex, setIndex, 'weight', event.target.value)} /></label><button className="step-button" aria-label="增加 2.5 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', 2.5)}>＋</button><span className="set-unit">kg</span></div>
+          <div className="set-stepper-control"><button className="step-button" aria-label="减少 2 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', -2)}>−</button><label><span className="sr-only">重量（公斤）</span><input className="set-input" type="text" inputMode="decimal" onPointerDown={event => { if (document.activeElement !== event.currentTarget) event.currentTarget.dataset.selectOnClick = "true"; }} onFocus={event => event.currentTarget.select()} onClick={event => { if (event.currentTarget.dataset.selectOnClick) { const input = event.currentTarget; const value = input.value; requestAnimationFrame(() => { if (document.activeElement === input && input.value === value) input.setSelectionRange(0, value.length); delete input.dataset.selectOnClick; }); } }} onBlur={event => { if (!event.currentTarget.value.trim()) onInputChange(exerciseIndex, setIndex, "weight", "0"); }} value={draftInputs[set.id]?.weight ?? set.weight} onChange={event => onInputChange(exerciseIndex, setIndex, 'weight', event.target.value)} /></label><button className="step-button" aria-label="增加 2 公斤" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'weight', 2)}>＋</button><span className="set-unit">kg</span></div>
           <span className="set-times">×</span>
           <div className="set-stepper-control reps-stepper-control"><button className="step-button" aria-label="减少 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', -1)}>−</button><label><span className="sr-only">次数</span><input className="set-input reps-input" type="number" inputMode="numeric" min="1" step="1" value={draftInputs[set.id]?.reps ?? set.reps} onChange={event => onInputChange(exerciseIndex, setIndex, 'reps', event.target.value)} /></label><button className="step-button" aria-label="增加 1 次" onClick={() => onAdjustSet(exerciseIndex, setIndex, 'reps', 1)}>＋</button><span className="set-unit">次</span></div>
         </div>
@@ -253,6 +258,8 @@ function ExercisePanel({ exercise, exerciseIndex, sessions, draftInputs, onInput
       <button className="add-set" onClick={() => onAddSet(exerciseIndex)}>＋ 添加一组</button>
       <button className="skip-exercise" onClick={() => onSkipExercise(exerciseIndex)}>跳过动作</button>
     </>}
+    </div></div>
+    <button className="collapse exercise-toggle" aria-expanded={!collapsed} onClick={onToggle}>{collapsed ? "展开动作" : "收起动作"}</button>
   </article>;
 }
 

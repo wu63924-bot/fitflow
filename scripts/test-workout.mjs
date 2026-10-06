@@ -88,6 +88,14 @@ try {
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile layout has no horizontal overflow');
     await page.getByRole('button', { name: '标记完成组' }).first().click();
     await page.locator('.rest-panel').waitFor();
+    check((await page.locator('.rest-panel').boundingBox()).height <= 120, 'expanded rest panel stays compact');
+    const restDeadline = (await stored(page)).restTimer.restEndsAt;
+    await page.getByRole('button', { name: '收起', exact: true }).click();
+    await page.locator('.rest-expand').waitFor();
+    check((await page.locator('.rest-panel').boundingBox()).height <= 55, 'collapsed rest panel stays compact');
+    await page.locator('.rest-expand').click();
+    await page.locator('.rest-collapse-button').waitFor();
+    check((await stored(page)).restTimer.restEndsAt === restDeadline, 'rest expand collapse preserves deadline');
     if (permission === 'default') {
       await page.getByRole('button', { name: '开启通知', exact: true }).click();
       check(await page.evaluate(() => window.permissionRequests) === 1, 'permission only from explicit click');

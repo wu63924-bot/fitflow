@@ -215,9 +215,8 @@ export function SessionPage() {
 
     {timer && <section className={`rest-panel card${timer.expanded ? '' : ' rest-collapsed'}`}>
       {timer.expanded ? <>
-        <div className="row-between"><div><strong className="rest-label">{remaining ? '组间休息' : '休息结束'}</strong><span className="rest-subtitle">准备第 {timerTarget ? timerTarget.setIndex + 1 : 1} 组 · {timerTarget?.exercise.name ?? ''}</span></div><strong className="rest-clock">{formatClock(remaining)}</strong></div>
+        <div className="row-between rest-header"><div className="rest-heading"><strong className="rest-label">{remaining ? '组间休息' : '休息结束'}</strong><span className="rest-subtitle">准备第 {timerTarget ? timerTarget.setIndex + 1 : 1} 组 · {timerTarget?.exercise.name ?? ''}</span></div><strong className="rest-clock">{formatClock(remaining)}</strong><button className="collapse rest-collapse-button" onClick={() => void mutate(current => { if (current.restTimer) current.restTimer.expanded = false; })}>收起</button></div>
         <div className="button-row"><button className="ghost-button" onClick={() => void onAdjustRest(-30)}>−30秒</button><button className="secondary-button" onClick={() => void onAdjustRest(30)}>＋30秒</button><button className="primary-button" onClick={() => void onSkipRest()}>跳过休息</button></div>
-        <button className="collapse" onClick={() => void mutate(current => { if (current.restTimer) current.restTimer.expanded = false; })}>收起</button>
       </> : <><button className="rest-expand" onClick={() => void mutate(current => { if (current.restTimer) current.restTimer.expanded = true; })}>⏱ {remaining ? '休息' : '休息结束'} {formatClock(remaining)}</button><button className="collapsed-add" onClick={() => void onAdjustRest(30)}>＋30s</button></>}
     </section>}
     <button className="primary-button finish-button" onClick={() => void onFinish()}>结束训练</button>

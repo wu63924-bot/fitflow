@@ -48,9 +48,11 @@ export function DietPage() {
     const [meals, target] = await Promise.all([listMealsForDate(date), getNutritionTarget()]);
     return { meals, target, nutrition: sumNutrition(meals) };
   }, [date]);
+  const [expandedMeals, setExpandedMeals] = useState<Partial<Record<MealType, boolean>>>({});
   const [undo, setUndo] = useState<{ date: string; type: MealType; item: MealItem; index: number }>();
   useEffect(() => {
     setUndo(undefined);
+    setExpandedMeals({});
   }, [date]);
   useEffect(() => {
     if (!undo) return;
@@ -130,10 +132,11 @@ export function DietPage() {
               {!!meal.items.length && <button className="meal-action meal-clear" onClick={() => void removeMeal(meal.type)}>清空本餐</button>}
             </div>
           </details>}
+          <button className="text-button meal-toggle" aria-label={`${expandedMeals[meal.type] ? '收起' : '展开'}${mealTitles[meal.type]}记录`} aria-expanded={Boolean(expandedMeals[meal.type])} aria-controls={`meal-details-${meal.type}`} onClick={() => setExpandedMeals(current => ({ ...current, [meal.type]: !current[meal.type] }))}>{expandedMeals[meal.type] ? '收起 ⌃' : '展开 ⌄'}</button>
           </div>
-          {meal.items.length ? <div className="meal-foods">{meal.items.map(item => <FoodItemRow key={item.id} item={item} date={date} type={meal.type} onRemove={() => void remove(meal.type, item.id)} onChanged={() => void refresh()} toast={toast} disabled={future} />)}</div> : null}
-
-
+          <div id={`meal-details-${meal.type}`} hidden={!expandedMeals[meal.type]}>
+          {meal.items.length ? <div className="meal-foods">{meal.items.map(item => <FoodItemRow key={item.id} item={item} date={date} type={meal.type} onRemove={() => void remove(meal.type, item.id)} onChanged={() => void refresh()} toast={toast} disabled={future} />)}</div> : <p className="muted small">暂无食物记录</p>}
+          </div>
         </article>;
       })}
       </div>

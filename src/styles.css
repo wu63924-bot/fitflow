@@ -731,3 +731,7 @@ img { display: block; max-width: 100%; }
   .plan-editor-page { --plan-action-bottom: 98px; }
   .app-main:has(~ .mini-workout) .plan-editor-page { --plan-action-bottom: 210px; }
 }
+
+.diet-page .diet-meal-head { gap: 6px; flex-wrap: wrap; }
+.diet-page .diet-meal-name { min-width: 48px; }
+.diet-page .meal-toggle { min-height: 44px; min-width: 48px; padding: 0 2px; white-space: nowrap; }

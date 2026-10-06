@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "dev:api": "node --env-file-if-exists=.env --experimental-strip-types server/index.ts",
     "typecheck:api": "tsc --project tsconfig.server.json",
+    "test:meal-collapse": "node scripts/test-meal-collapse.mjs",
     "test:plan-editor": "node scripts/test-plan-editor.mjs",
     "test:workout": "node scripts/test-workout.mjs",
     "test:recognition": "node scripts/test-food-recognition.mjs && node --experimental-strip-types scripts/test-food-recognition-api.mjs && node --experimental-strip-types scripts/test-api-protection.mjs",

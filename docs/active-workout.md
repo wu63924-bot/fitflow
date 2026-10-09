@@ -29,3 +29,8 @@ Coverage includes zero/existing weight replacement, empty blur, two-kilogram ste
 WebKit automation is not an actual iPhone Safari/PWA device test. Manually verify the real iPhone keyboard, cursor editing, safe areas, text zoom, installed PWA permission flow, background/lock-screen behavior and reminder delay after suspension. Native OS notification display and sound/vibration behavior depend on device settings and remain device acceptance checks.
 
 Pushing `main` triggers the existing GitHub Pages deployment workflow. This frontend change does not require a Phase 6B-3 cloud API upload. Existing installed PWAs may need to reopen after their service worker updates.
+
+
+## Session-wide rest duration
+
+The training page offers a collapsed Default Rest entry, including when no rest timer is running. Apply a whole number from 0 to 600 seconds to update all exercises in the current session through the existing repository transaction. This affects subsequent rest timers, including newly added exercises when session durations are uniform. The current timer, completed sets, original plan and global settings remain unchanged. The duration survives minimization and reload through existing exercise `restSeconds` fields; no database schema change is needed.

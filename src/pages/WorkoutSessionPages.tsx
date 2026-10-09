@@ -40,6 +40,7 @@ export function SessionPage() {
   const [draftInputs, setDraftInputs] = useState<Record<string, SetInput>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [restDetailsOpen, setRestDetailsOpen] = useState(false);
+  const [sessionRestDraft, setSessionRestDraft] = useState<string>();
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const [exerciseId, setExerciseId] = useState('');
   const { data, loading, refresh, setData } = useAsyncData<SessionLoaded>(async () => {
@@ -62,6 +63,9 @@ export function SessionPage() {
   const activeSession = session;
 
   const currentIndex = Math.max(0, Math.min(activeSession.currentExerciseIndex, Math.max(0, activeSession.exercises.length - 1)));
+  const restValues = activeSession.exercises.map(exercise => exercise.restSeconds);
+  const uniformRest = restValues.length > 0 && restValues.every(seconds => seconds === restValues[0]);
+  const defaultRestInput = sessionRestDraft ?? String(restValues[currentIndex] ?? 90);
   const timer = activeSession.restTimer;
   const remaining = timer ? remainingSeconds(timer, now) : 0;
   const timerTarget = timer ? resolveTarget(activeSession, timer) : undefined;
@@ -165,6 +169,19 @@ export function SessionPage() {
     });
   }
 
+  async function onSaveDefaultRest() {
+    const seconds = Number(defaultRestInput);
+    if (!defaultRestInput.trim() || !Number.isInteger(seconds) || seconds < 0 || seconds > 600) { toast('休息时间需为 0–600 秒的整数'); return; }
+    try {
+      await mutate(current => {
+        if (current.status !== 'in_progress') throw new Error('训练已结束');
+        for (const exercise of current.exercises) exercise.restSeconds = seconds;
+      });
+      setSessionRestDraft(undefined);
+      toast('本次训练默认休息已更新，当前倒计时保持不变');
+    } catch (error) { toast(error instanceof Error ? error.message : '休息时间保存失败'); }
+  }
+
   async function onAdjustRest(seconds: number) {
     if (!activeSession.restTimer) return;
     await mutate(current => { if (current.restTimer) current.restTimer = adjustRestTimer(current.restTimer, seconds, Date.now()); });
@@ -175,7 +192,7 @@ export function SessionPage() {
   async function addTemporaryExercise() {
     const definition = activeData.exercises.find(item => item.id === exerciseId);
     if (!definition) { toast('先选择一个动作'); return; }
-    const planned = { ...plannedExerciseFromDefinition(definition, activeSession.exercises.length), sets: 1 };
+    const planned = { ...plannedExerciseFromDefinition(definition, activeSession.exercises.length), sets: 1, restSeconds: uniformRest ? restValues[0] : definition.restSeconds };
     const updated = await addExerciseToWorkout(activeSession.id, planned);
     if (updated) {
       setData(current => current ? { ...current, session: updated } : current);
@@ -203,6 +220,7 @@ export function SessionPage() {
     <header className="session-toolbar"><button className="ghost-button" onClick={() => void onMinimize()}>‹ 返回主页</button><strong>FitFlow</strong><button className="end-button" onClick={() => void onFinish()}>结束训练</button></header>
     <h1 className="session-title">{activeSession.workoutDayName}</h1>
     <p className="session-summary"><span className="elapsed">{formatDuration((now - activeSession.startedAt) / 1000)}</span> · 已完成 {countCompletedSets(activeSession)}/{countSets(activeSession.exercises)} 组</p>
+    {!!restValues.length && <details className="session-rest-default"><summary>默认休息 · {uniformRest ? `${restValues[0]}秒` : '按动作设置'}<span aria-hidden="true">⌄</span></summary><form noValidate onSubmit={event => { event.preventDefault(); void onSaveDefaultRest(); }}><label className="field-label">本次训练休息（秒）<input className="text-input" type="number" inputMode="numeric" min="0" max="600" step="1" value={defaultRestInput} onChange={event => setSessionRestDraft(event.target.value)} /></label><button className="secondary-button" type="submit">应用本次训练</button></form><p className="muted small">用于所有动作的后续休息，当前倒计时保持不变。</p></details>}
     {timer && <RestNotificationOffer />}
     {!exerciseViews.length && <EmptyState title="本次训练还没有动作">从动作库临时添加一个动作。</EmptyState>}
     {exerciseViews.map((exercise, index) => <ExercisePanel key={exercise.id} collapsed={collapsed[exercise.id] ?? index !== currentIndex} onToggle={() => setCollapsed(current => ({ ...current, [exercise.id]: !(current[exercise.id] ?? index !== currentIndex) }))} exercise={exercise} exerciseIndex={index} sessions={activeData.sessions} draftInputs={draftInputs} onInputChange={onInputChange} onAdjustSet={onAdjustSet} onSaveSets={onSaveSets} onCompleteSet={onCompleteSet} onAddSet={onAddSet} onDeleteSet={onDeleteSet} onSkipExercise={onSkipExercise} />)}

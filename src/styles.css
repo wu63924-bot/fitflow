@@ -735,3 +735,10 @@ img { display: block; max-width: 100%; }
 .diet-page .diet-meal-head { gap: 6px; flex-wrap: wrap; }
 .diet-page .diet-meal-name { min-width: 48px; }
 .diet-page .meal-toggle { min-height: 44px; min-width: 48px; padding: 0 2px; white-space: nowrap; }
+
+.session-rest-default { margin: -8px 0 16px; }
+.session-rest-default > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; width: fit-content; list-style: none; color: var(--muted); font-size: 12px; cursor: pointer; }
+.session-rest-default > summary::-webkit-details-marker { display: none; }
+.session-rest-default form { display: flex; align-items: flex-end; gap: 10px; }
+.session-rest-default form > label { flex: 1; min-width: 0; }
+.session-rest-default form > button { min-height: 44px; flex-shrink: 0; }

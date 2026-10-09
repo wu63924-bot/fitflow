@@ -122,6 +122,24 @@ try {
     await page.getByRole('button', { name: '收起休息设置', exact: true }).click();
     check(await page.locator('.rest-controls').count() === 0, 'rest settings close cleanly');
     check((await stored(page)).restTimer.restEndsAt === restDeadline, 'rest controls preserve deadline');
+    await page.locator('.session-rest-default summary').click();
+    const defaultRest = page.getByRole('spinbutton', { name: '本次训练休息（秒）', exact: true });
+    await defaultRest.fill('-1');
+    await page.getByRole('button', { name: '应用本次训练', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: '休息时间需为 0–600 秒的整数' }).waitFor();
+    check((await stored(page)).exercises.every(exercise => exercise.restSeconds === 30), 'invalid rest duration does not change session');
+    await defaultRest.fill('0');
+    await page.getByRole('button', { name: '应用本次训练', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.session-rest-default summary').textContent.includes('0秒'));
+    check((await stored(page)).exercises.every(exercise => exercise.restSeconds === 0), 'zero rest duration is accepted');
+    await defaultRest.fill('120');
+    await page.getByRole('button', { name: '应用本次训练', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.session-rest-default summary').textContent.includes('120秒'));
+    const restUpdated = await stored(page);
+    check(restUpdated.exercises.every(exercise => exercise.restSeconds === 120), 'session rest updates every exercise');
+    check(restUpdated.restTimer.restEndsAt === restDeadline, 'default rest does not reset active countdown');
+    await page.locator('.session-rest-default summary').click();
+
     if (process.env.WORKOUT_SCREENSHOT && permission === 'denied') {
       if (await page.getByRole('button', { name: '关闭数字调整' }).count()) await page.getByRole('button', { name: '关闭数字调整' }).click();
       await page.locator('.toast').waitFor({ state: 'hidden' });
@@ -160,9 +178,20 @@ try {
     check(await weight.evaluate(el => parseFloat(getComputedStyle(el).fontSize)) >= 16, 'narrow mobile input still 16px');
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'narrow mobile training does not overflow');
     check((await stored(page)).restTimer.restEndsAt === before.restTimer.restEndsAt, 'return preserves rest deadline');
+    check((await stored(page)).exercises.every(exercise => exercise.restSeconds === 120), 'session default survives minimization');
+    await firstExercise.getByRole('button', { name: '完成下一组', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.complete-next')?.textContent === '本动作已完成');
+    const nextRest = (await stored(page)).restTimer;
+    check(nextRest.restEndsAt - nextRest.restStartedAt === 120000, 'next rest uses new session default');
+    await page.getByRole('button', { name: '＋ 添加动作', exact: true }).click();
+    await page.getByRole('combobox', { name: '选择临时动作', exact: true }).selectOption({ index: 1 });
+    await page.getByRole('button', { name: '添加', exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.simple-exercise').length === 3);
+    check((await stored(page)).exercises.every(exercise => exercise.restSeconds === 120), 'temporary exercise inherits session rest');
+
     if (permission === 'default') check(await page.getByRole('button', { name: '开启通知', exact: true }).count() === 0, 'denial not requested again');
     await page.getByRole('button', { name: '休息设置', exact: true }).click();
-    await page.getByRole('button', { name: '−30秒', exact: true }).click();
+    for (let step = 0; step < 4; step++) await page.getByRole('button', { name: '−30秒', exact: true }).click();
     await page.getByRole('status').filter({ hasText: '休息结束，可以开始下一组了' }).waitFor();
     check((await stored(page)).restTimer.expiredNotified, 'foreground expiration marks notified');
     await page.getByRole('button', { name: '跳过休息', exact: true }).click();

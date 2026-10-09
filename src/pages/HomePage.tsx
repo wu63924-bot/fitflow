@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { EditWorkoutRecordDialog } from '../components/EditWorkoutRecordDialog';
+import type { WorkoutSession } from '../types';
 import { useNavigate } from 'react-router';
 import { mockUser } from '../data/mock';
 import { dateKey } from '../utils/format';
@@ -16,7 +19,8 @@ import { EmptyState, ProgressRow, SectionTitle, todayLabel, useToast } from '../
 export function HomePage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { data, loading } = useAsyncData(async () => {
+  const [editingRecord, setEditingRecord] = useState<WorkoutSession>();
+  const { data, loading, refresh } = useAsyncData(async () => {
     const today = dateKey(new Date());
     const [plans, sessions, meals, target, settings, bodyRecords, schedule] = await Promise.all([
       listTrainingPlans(), listWorkoutSessions(), listMealsForDate(today), getNutritionTarget(), getSettings(), listBodyRecords(), getDailySchedule(today)
@@ -85,6 +89,7 @@ export function HomePage() {
                   : data.latest ? `训练 ${data.duration} min · ${data.completedSets} 组已完成` : '前往日历安排力量、有氧或休息'}
       </p>
       <button className="primary-button hero-button" onClick={() => void onStartWorkout()}>{workoutButton}</button>
+      {data.latest && !data.inProgress && <button className="secondary-button full-button home-edit-record" onClick={() => setEditingRecord(data.latest)}>修改今日训练记录</button>}
     </section>
 
     <section className="section">
@@ -107,6 +112,7 @@ export function HomePage() {
       </div>
     </section>
     {!data.plan && !schedule && <EmptyState title="从日历安排今天">可以从训练计划选择，也可以创建一次性训练。</EmptyState>}
+    {editingRecord && <EditWorkoutRecordDialog session={editingRecord} onClose={() => setEditingRecord(undefined)} onSaved={() => { setEditingRecord(undefined); void refresh(); }} />}
     {data.volume > 0 && <p className="home-volume">今日训练容量 {data.volume.toLocaleString()} kg</p>}
   </div>;
 }

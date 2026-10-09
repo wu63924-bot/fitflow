@@ -13,6 +13,7 @@
     "typecheck:api": "tsc --project tsconfig.server.json",
     "test:meal-collapse": "node scripts/test-meal-collapse.mjs",
     "test:plan-editor": "node scripts/test-plan-editor.mjs",
+    "test:workout-record": "node scripts/test-workout-record.mjs",
     "test:workout": "node scripts/test-workout.mjs",
     "test:recognition": "node scripts/test-food-recognition.mjs && node --experimental-strip-types scripts/test-food-recognition-api.mjs && node --experimental-strip-types scripts/test-api-protection.mjs",
     "build:api": "tsc --project tsconfig.server.build.json && node scripts/package-api.mjs",

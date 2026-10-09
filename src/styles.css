@@ -742,3 +742,14 @@ img { display: block; max-width: 100%; }
 .session-rest-default form { display: flex; align-items: flex-end; gap: 10px; }
 .session-rest-default form > label { flex: 1; min-width: 0; }
 .session-rest-default form > button { min-height: 44px; flex-shrink: 0; }
+
+.home-edit-record { margin-top: 10px; min-height: 44px; }
+.record-editor-exercise { margin-top: 16px; }
+.record-editor-exercise h3 { font-size: 15px; margin: 0 0 10px; }
+.record-editor-head, .record-editor-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 8px; align-items: center; text-align: center; }
+.record-editor-head { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.record-editor-row { margin-bottom: 8px; }
+.record-editor-row .text-input { min-height: 44px; font-size: 16px; padding: 0 6px; text-align: center; }
+.record-editor-row input[type=checkbox] { width: 24px; height: 24px; margin: 10px; accent-color: var(--green); }
+.record-editor-actions { display: flex; gap: 10px; margin-top: 20px; }
+.record-editor-actions > button { flex: 1; min-height: 44px; }

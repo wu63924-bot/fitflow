@@ -1,3 +1,4 @@
+import { EditWorkoutRecordDialog } from '../components/EditWorkoutRecordDialog';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { dateKey } from '../utils/format';
@@ -142,6 +143,7 @@ export function DayDetailPage() {
   const toast = useToast();
   const [sheetView, setSheetView] = useState<'menu' | 'note' | 'cardio-log'>();
   const [copySource, setCopySource] = useState<WorkoutSession>();
+  const [editingRecord, setEditingRecord] = useState<WorkoutSession>();
   const parsedDate = new Date(`${date}T12:00:00`);
   const validDate = !Number.isNaN(parsedDate.getTime()) && dateKey(parsedDate) === date;
   const { data, loading, refresh } = useAsyncData(async () => {
@@ -208,6 +210,7 @@ export function DayDetailPage() {
       </div>)}
       <div className="history-actions">
         {session.status === 'completed' && <button className="text-button" onClick={() => navigate(`/workout/report/${session.id}`)}>查看训练报告</button>}
+        {session.status === 'completed' && isToday && <button className="secondary-button" onClick={() => setEditingRecord(session)}>修改今日训练记录</button>}
         {session.status === 'completed' && isPast && <button className="secondary-button" onClick={() => setCopySource(session)}>复制到今天</button>}
         <button className="history-delete" onClick={() => void onDeleteSession(session)}>删除记录</button>
       </div>
@@ -230,6 +233,7 @@ export function DayDetailPage() {
       {data.bodyRecord ? <div className="card body-day-record"><span>体重</span><strong>{data.bodyRecord.weight} kg</strong><span>身高 {data.bodyRecord.height} cm</span></div> : <EmptyState title="当天没有身体数据" />}
     </section>
 
+    {editingRecord && <EditWorkoutRecordDialog session={editingRecord} onClose={() => setEditingRecord(undefined)} onSaved={() => { setEditingRecord(undefined); void refresh(); }} />}
     {sheetView && <DailyScheduleSheet date={date} schedule={data.schedule} plans={data.plans} exercises={data.exercises} allowTraining={!isPast && !hasWorkoutRecord} initialView={sheetView} onClose={() => setSheetView(undefined)} onSaved={() => void refresh()} />}
     {copySource && <CopyWorkoutDialog session={copySource} onClose={() => { setCopySource(undefined); void refresh(); }} />}
   </div>;

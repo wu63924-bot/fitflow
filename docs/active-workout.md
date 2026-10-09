@@ -34,3 +34,8 @@ Pushing `main` triggers the existing GitHub Pages deployment workflow. This fron
 ## Session-wide rest duration
 
 The training page offers a collapsed Default Rest entry, including when no rest timer is running. Apply a whole number from 0 to 600 seconds to update all exercises in the current session through the existing repository transaction. This affects subsequent rest timers, including newly added exercises when session durations are uniform. The current timer, completed sets, original plan and global settings remain unchanged. The duration survives minimization and reload through existing exercise `restSeconds` fields; no database schema change is needed.
+
+
+## Edit today's completed workout
+
+The home page offers an edit button for its latest completed workout today (when no workout is in progress). Today's history detail offers an edit button on each completed workout. The dialog edits existing set weights, repetition counts and completion flags only. It does not add or delete exercises/sets, alter training times, reopen a session or restart a rest timer. Saving rechecks the current stored status and date inside the existing workout transaction. Invalid or stale edits roll back. A newly marked set uses the workout's original end time; clearing completion removes that set's completion timestamp. Capacity, completed counts and reports use the existing computed values, and the parent page reloads after save. No schema change is required.

@@ -6,6 +6,11 @@ import { Modal, useToast } from '../components/UI';
 import { completeCardio, createStrengthTemplateFromPlan, saveDailyNote, saveDailySchedule } from '../services/scheduleService';
 import type { CardioActivity, DailySchedule, Exercise, ScheduledStrengthExercise, ScheduledStrengthTemplate, TrainingPlan } from '../types';
 
+function customWorkoutName(exercises: { category: string }[]): string {
+  const parts = [...new Set(exercises.map(exercise => exercise.category === '核心' ? '腹部' : exercise.category))];
+  return parts.length ? `${parts.map(part => ['胸', '背', '肩', '腿'].includes(part) ? `${part}部` : part).join('、')}训练` : '自定义训练';
+}
+
 const cardioActivities: CardioActivity[] = ['跑步', '骑行', '椭圆机', '爬楼机', '跳绳', '游泳', '其他'];
 
 interface CustomSetDraft { weight: string; reps: string; }
@@ -32,7 +37,6 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
   const [planId, setPlanId] = useState(initialPlan?.id ?? '');
   const [dayId, setDayId] = useState(initialDay?.id ?? '');
   const [strengthMode, setStrengthMode] = useState<'plan' | 'custom'>(schedule?.workoutTemplate ? 'custom' : 'plan');
-  const [workoutName, setWorkoutName] = useState(schedule?.workoutTemplate?.workoutDayName ?? '自定义训练');
   const [customExercises, setCustomExercises] = useState<CustomExerciseDraft[]>(() => schedule?.workoutTemplate?.exercises.map(exercise => ({
     ...exercise,
     sets: exercise.sets.map(set => ({ weight: String(set.weight), reps: String(set.reps) })),
@@ -128,7 +132,7 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
             sets
           };
         });
-        const savedName = workoutName.trim() || '自定义训练';
+        const savedName = customWorkoutName(templateExercises);
         workoutTemplate = {
           planId: schedule?.workoutTemplate?.planId,
           planName: schedule?.workoutTemplate?.planName ?? '自定义训练',
@@ -183,7 +187,7 @@ export function DailyScheduleSheet({ date, schedule, plans, exercises, allowTrai
         </select></label>
         {!trainingDays.length && <p className="muted small">请先创建一个包含力量训练日的计划。</p>}
       </> : <>
-        <label className="field-label">本次训练名称<input className="text-input" maxLength={30} value={workoutName} onChange={event => setWorkoutName(event.target.value)} /></label>
+        <p className="muted small" aria-live="polite">本次训练：<strong className="custom-workout-name">{customExercises.length ? customWorkoutName(customExercises.map(exercise => ({ category: exercises.find(item => item.id === exercise.exerciseId)?.category ?? exercise.category }))) : '添加动作后自动生成名称'}</strong></p>
         {customExercises.map((exercise, index) => <section className="custom-exercise-editor" key={`${exercise.exerciseId}-${index}`}>
           <div className="row-between"><strong>{index + 1}. {exercise.name}</strong><button className="text-button" type="button" onClick={() => setCustomExercises(current => current.filter((_, itemIndex) => itemIndex !== index))}>移除</button></div>
           <label className="field-label">动作间休息（秒）<input className="text-input" type="number" min="0" step="1" value={exercise.restInput} onChange={event => updateExercise(index, current => ({ ...current, restInput: event.target.value }))} /></label>

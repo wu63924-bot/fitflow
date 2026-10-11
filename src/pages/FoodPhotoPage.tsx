@@ -9,6 +9,7 @@ import { compressFoodImage } from '../utils/foodImage';
 import type { ProcessedFoodImage } from '../utils/foodImage';
 import { sumItems } from '../utils/nutrition';
 import { dateKey } from '../utils/format';
+import { mealTypeAtTime } from '../utils/mealTime';
 import type { MealType } from '../types';
 
 type RecognitionState = 'idle' | 'selecting' | 'preview' | 'analyzing' | 'success' | 'error';
@@ -88,12 +89,14 @@ export function FoodPhotoPage() {
     lock.current = true;
     const ticket = ++request.current;
     recognitionAbort.current?.abort();
+    const recognitionTime = new Date();
     const controller = new AbortController();
     recognitionAbort.current = controller;
     setState('analyzing'); setError(''); setHasResult(false);
     try {
       const result = await recognizeFood(image.blob, undefined, controller.signal);
       if (ticket !== request.current) return;
+      setMeal(mealTypeAtTime(recognitionTime));
       setResults(result.foods);
       setHasResult(true); setState('success');
     } catch (reason) {
@@ -146,6 +149,7 @@ export function FoodPhotoPage() {
     {hasResult && <>
       <section className="card recognition-summary" aria-label="本餐营养"><h2>本餐营养 · AI估算</h2><strong>{Math.round(total.calories)} kcal</strong><p>蛋白质 {macro(total.protein)}g · 碳水 {macro(total.carbs)}g · 脂肪 {macro(total.fat)}g</p><small className="muted">无效项目暂不计入汇总，保存时校验。</small></section>
       <fieldset className="recognition-controls" disabled={busy}>
+        <p className="muted small">餐次按开始识别时的本地时间默认选择，可手动调整。早餐 05:00–10:59，午餐 11:00–14:59，晚餐 15:00–20:59，其余为加餐。</p>
         <label className="field-label">餐次<select className="text-input" value={meal} onChange={event => setMeal(event.target.value as MealType)}>{mealOrder.map(value => <option key={value} value={value}>{mealTitles[value]}</option>)}</select></label>
         {results.map((row, index) => <article className="card recognition-food" key={row.id}>
           <div className="recognition-food-row">
